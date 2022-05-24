@@ -1,0 +1,13 @@
+iso3: tcd
+codab:
+  hdx_dataset_name: tcd_admbnda_adm0_ocha.zip
+  layer_base_name: tcd_admbnda_adm{admin_level}_ocha.shp
+  admin_level_max: 0
+glofas:
+  reporting_points:
+  - name: Ndjamena_Fort_Lamy
+    lat: 12.12
+    lon: 15.03
+  - name: Mailao
+    lat: 11.58
+    lon: 15.28
