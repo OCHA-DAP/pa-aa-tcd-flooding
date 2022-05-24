@@ -42,9 +42,9 @@ Create a directory where you would like the data to be stored,
 and point to it using an environment variable called
 `AA_DATA_DIR`.
 
-Next create a new virtual environment 
+Next create a new virtual environment
 
-Install the GloFAS branch of the toolbox with 
+Install the GloFAS branch of the toolbox with
 
 ```shell
 pip install git+https://github.com/OCHA-DAP/pa-aa-toolbox.git@feature/glofas#egg=aa-toolbox

@@ -1,59 +1,76 @@
-import xarray as xr
-import pandas as pd
-import geopandas as gpd
 import logging
+
+import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import xarray as xr
 from scipy.interpolate import interp1d
 from scipy.stats import genextreme as gev
 
-from src.datasource_extensions import (CERF, CodABExt, FloodScan, Emdat,FloodScanStats, IfrcImpact)
 from src import constants
+from src.datasource_extensions import (
+    CERF,
+    CodABExt,
+    Emdat,
+    FloodScan,
+    FloodScanStats,
+    IfrcImpact,
+)
 
 logger = logging.getLogger(__name__)
 
 
-#TODO: maybe there is a cleaner way to do this (e.g. using rioxarray?)
-#question: should this preprocessing go here or in datasource_extensions? 
+# TODO: maybe there is a cleaner way to do this (e.g. using rioxarray?)
+# question: should this preprocessing go here or in datasource_extensions?
 def load_floodscan() -> xr.Dataset:
     floodscan = FloodScan(country_config=constants.country_config)
     da = floodscan.load()
-    da.SFED_AREA.attrs.pop('grid_mapping')
-    da.NDT_SFED_AREA.attrs.pop('grid_mapping')
-    da.LWMASK_AREA.attrs.pop('grid_mapping')
-    return da.rio.write_crs("EPSG:4326",inplace=True)
+    da.SFED_AREA.attrs.pop("grid_mapping")
+    da.NDT_SFED_AREA.attrs.pop("grid_mapping")
+    da.LWMASK_AREA.attrs.pop("grid_mapping")
+    return da.rio.write_crs("EPSG:4326", inplace=True)
+
 
 def load_emdat_exploration() -> pd.DataFrame:
     emdat = Emdat(country_config=constants.country_config)
     return emdat.load_exploration()
 
+
 def load_emdat() -> pd.DataFrame:
     emdat = Emdat(country_config=constants.country_config)
     return emdat.load()
 
-def load_floodscan_stats(adm_level:int) -> pd.DataFrame:
-    fs_stats = FloodScanStats(country_config=constants.country_config, 
-    adm_level=adm_level)
+
+def load_floodscan_stats(adm_level: int) -> pd.DataFrame:
+    fs_stats = FloodScanStats(
+        country_config=constants.country_config, adm_level=adm_level
+    )
     return fs_stats.load()
+
 
 def load_cerf() -> pd.DataFrame:
     cerf = CERF(country_config=constants.country_config)
     return cerf.load()
 
+
 def load_ifrc() -> pd.DataFrame:
     ifrc = IfrcImpact(country_config=constants.country_config)
     return ifrc.load()
 
-#TODO: remove once codabs are fixed
+
+# TODO: remove once codabs are fixed
 def load_adm2() -> gpd.GeoDataFrame:
     codab_adm2 = CodABExt(country_config=constants.country_config, adm_level=2)
     return codab_adm2.load()
+
 
 def load_adm1() -> gpd.GeoDataFrame:
     codab_adm1 = CodABExt(country_config=constants.country_config, adm_level=1)
     return codab_adm1.load()
 
-#copied from pa-anticipatory-action
+
+# copied from pa-anticipatory-action
 def get_return_periods_dataframe(
     df: pd.DataFrame,
     rp_var: str,

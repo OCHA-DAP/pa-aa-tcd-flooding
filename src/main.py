@@ -1,9 +1,6 @@
 import argparse
 import logging
 
-# from src import constants  # noqa: F401
-from aatoolbox import CodAB
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

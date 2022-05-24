@@ -1,19 +1,21 @@
-### Flooded fraction in the country and its correlation to impact
+# Flooded fraction in the country and its correlation to impact
 
-This is an exploration to understanding if anticipating an increased risk in TCD is possible. 
-We start by getting a historical overview on the floods in the country from FloodScan
-We compare this to the limited impact data we got. 
+This is an exploration to understanding if anticipating an increased
+ risk in TCD is possible.
+We start by getting a historical overview on the floods in the country
+ from FloodScan
+We compare this to the limited impact data we got.
 
-This is an exploration of a quick understanding of increased risk, not a full AA framework
-3 notions: 
+This is an exploration of a quick understanding of increased risk,
+ not a full AA framework
+3 notions:
 
-- recommended focus on riverine flooding 
+- recommended focus on riverine flooding
 - priority areas/provinces: N'Djamena and Mayo Kebbi Est
 - expected peak period: september-october (sometimes until november)
 
-This notebook focuses on the whole country and `02_tcd_floodscan_roi.md` zooms in on the priority provinces
-
-
+This notebook focuses on the whole country and `02_tcd_floodscan_roi.md`
+ zooms in on the priority provinces
 
 ```python
 %load_ext autoreload
@@ -57,7 +59,7 @@ alt.data_transformers.enable("data_server")
 library(tidyverse)
 ```
 
-#### define functions
+## define functions
 
 ```R
 plotFloodedFraction <- function (df,y_col,facet_col){
@@ -128,10 +130,13 @@ df_floodscan_country[f"mean_{bound_col}_perc"] = (
 )
 ```
 
-We can plot the data over all years. We plot both the raw data and smoothed data. 
-We see a yearly pattern where some years the peak is higher than others (though a max of 0.8% of the country is flooded). 
+We can plot the data over all years. We plot both the raw data and
+ smoothed data.
+We see a yearly pattern where some years the peak is higher than
+ others (though a max of 0.8% of the country is flooded).
 
-We see that the shape of the peaks also differ. Some are high but short while others the max value is lower but they consist for a longer period. 
+We see that the shape of the peaks also differ. Some are high but
+ short while others the max value is lower but they consist for a longer period.
 What the difference in impact of these patterns is, I am unsure about.
 
 ```python
@@ -173,7 +178,8 @@ mutate(time = as.Date(time, format = '%Y-%m-%d'))
 plotFloodedFraction(df_plot,'mean_admin0Pcod_perc','year')
 ```
 
-Next we compute the return period and check which years had a peak above the return period. 
+Next we compute the return period and check which years had a peak
+ above the return period.
 It is discussable whether only looking at the peak is the best method.
 
 ```python
@@ -240,19 +246,20 @@ df_floodscan_peak[
 ].sort_values("year")
 ```
 
-We can conclude that: 
+We can conclude that:
+
 - Every year a small part of the country gets flooded
-- 1998, 2001, 2010, and 2012 saw the highest peak. 
-- The peak is generally between Aug and Sep, which is in the second half of the rainy season
+- 1998, 2001, 2010, and 2012 saw the highest peak.
+- The peak is generally between Aug and Sep, which is in the
+ second half of the rainy season
 - We do see differences in shapes of the peaks during different years
-- Flooding should potentially be looked at at a more local scale. 
+- Flooding should potentially be looked at at a more local scale.
 
+## Geospatial distribution
 
-### Geospatial distribution
-We next plot the rasters at the points there was the most flooding. 
+We next plot the rasters at the points there was the most flooding.
 
-From here we can see that the most flooding occurs towards the south. 
-
+From here we can see that the most flooding occurs towards the south.
 
 ```python
 timest_rp5 = list(
@@ -306,21 +313,26 @@ da_clip.sel(
 )
 ```
 
-### Comparison to impact data
-Now that we have the floodscan data, we can check if this corresponds with impact data. 
+## Comparison to impact data
 
-The sources we have are: 
+Now that we have the floodscan data, we can check if this
+ corresponds with impact data.
+
+The sources we have are:
+
 - CERF allocations
 - an internal list shared by IFRC
 - EM-DAT
 
-
 ### CERF allocations
-CERF has allocation data since 2006. We see that a big allocation on floods was done in 2012, which coincides with the large peak 
-we saw in the FloodScan data. 
 
-Smaller allocations were done in 2009 and 2011 that were on displacement but mention floods. The 2011 one could
-possibly relate to the flooding we saw in 2010. 
+CERF has allocation data since 2006. We see that a big allocation on
+ floods was done in 2012, which coincides with the large peak
+we saw in the FloodScan data.
+
+Smaller allocations were done in 2009 and 2011 that were on displacement
+ but mention floods. The 2011 one could
+possibly relate to the flooding we saw in 2010.
 
 ```python
 df_cerf = load_cerf()
@@ -353,14 +365,18 @@ with pd.option_context("display.max_colwidth", None):
 ```
 
 ### IFRC
-IFRC shared an internal list of impact years. So we look at these as well. We assume the data is recorded since 2012
+
+IFRC shared an internal list of impact years. So we look at these as well.
+ We assume the data is recorded since 2012
 
 From this data we can see that 2012 was clearly the most affected year.
-2020 saw the second-largest number of affected people. This might be caused by flooding in the capital #TODO: double-check
+2020 saw the second-largest number of affected people. This might be caused
+ by flooding in the capital #TODO: double-check
 
-Moreover, we can see that 7/10 years are recorded in the data as having some flood inpact (though 2014 and 2016 saw relatively small impact)
+Moreover, we can see that 7/10 years are recorded in the data as having some
+ flood inpact (though 2014 and 2016 saw relatively small impact)
 
-It is unclear if e.g. 2013 refers to the impact caused by the 2012 flood. 
+It is unclear if e.g. 2013 refers to the impact caused by the 2012 flood.
 
 ```python
 df_ifrc = load_ifrc()
@@ -401,6 +417,7 @@ alt.Chart(df_ifrc_year_long).mark_bar().encode(x="year:N", y="value:Q").facet(
 ```
 
 ### EM-DAT
+
 Another commonly used source is em-dat
 
 ```python
@@ -523,28 +540,31 @@ alt.Chart(df_emdat_year_long).mark_bar().encode(
 ).facet(facet="indicator:N", columns=4).resolve_scale(y="independent")
 ```
 
-<!-- #region -->
-From the EM-DAT data we see again the impact of the 2012 flood confirmed. 
-However, we see also some different patterns. 
+From the EM-DAT data we see again the impact of the 2012 flood confirmed.
+However, we see also some different patterns.
 
-For example the impact of 2021 is substanially larger than that of 2020, which was the other way around in the IFRC data. 
-In return, 2019 has barely any impact in the EM-DAT data while it has in the IFRC data
+For example the impact of 2021 is substanially larger than that of 2020,
+ which was the other way around in the IFRC data.
+In return, 2019 has barely any impact in the EM-DAT data while it has
+ in the IFRC data
 
+We can also look at the data before 2012. We see significant impact
+ in 2010 and 2001, which corresponds to the floodscan data.
+In 1998 there was no impact recorded though, which is suspicious.
 
-We can also look at the data before 2012. We see significant impact in 2010 and 2001, which corresponds to the floodscan data. 
-In 1998 there was no impact recorded though, which is suspicious. 
-
-Another suspicion is that there was a substantial number of deaths recorded in 2006 but no people affected. 
-<!-- #endregion -->
+Another suspicion is that there was a substantial number of deaths
+ recorded in 2006 but no people affected.
 
 Questions:
-- Why 2020 is known as big flood, which is also partly shown in impact data, but not being seen in floodscan data (nor glofas see later notebook). 
-- zoom in to specific areas of impact (see next notebook a little bit as well)
 
+- Why 2020 is known as big flood, which is also partly shown in impact data,
+ but not being seen in floodscan data (nor glofas see later notebook).
+- zoom in to specific areas of impact (see next notebook a little bit as well)
 
 2020 resources:
 
-- [IFRC doc](https://adore.ifrc.org/Download.aspx?FileId=348595) detailing impact and which provinces
+- [IFRC doc](https://adore.ifrc.org/Download.aspx?FileId=348595)
+ detailing impact and which provinces
 - [Images of flooding from floodlist](https://floodlist.com/africa/chad-floods-ndjamena-november-2020)
 - [UNOSAT flood extent](https://unosat-maps.web.cern.ch/TD/FL20200826TCD/UNOSAT_A3_Natural_Landscape_FL20200826TCD_20200902_20200906_Chad.pdf)
 
