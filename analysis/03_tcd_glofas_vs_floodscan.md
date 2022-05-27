@@ -10,12 +10,9 @@ Just loading the data and some simple plots but real analysis still has to
 Some questions:
 
 - What is/are the best reporting point to use?
-- The Ndjamena Fort Lamy reporting point shows a max value of 45 while
-if you go to the GloFAS map explorer the return period graph shows a 1.5
- year return period value of 25000. On whose side is the bug?
 - In the impact data and from talks it is stated that 2020 is a bad year
- but from my first looks we don't see that back in GloFAS or Floodscan.
- What might be the reason?
+  but from my first looks we don't see that back in GloFAS or Floodscan.
+  What might be the reason?
 - How is the correspondence between floodscan and GloFAS?
 - How is the correspondence between these two and the impact data?
 
@@ -30,9 +27,10 @@ if you go to the GloFAS map explorer the return period graph shows a 1.5
 ```python
 import altair as alt
 import pandas as pd
-
 from aatoolbox import CodAB, GeoBoundingBox, GlofasReanalysis
+
 from src import constants
+from src.utils import load_floodscan
 ```
 
 ```python
@@ -87,38 +85,13 @@ alt.layer(plt_orig, data=df_long).properties(
 ).facet("station:N", columns=1).resolve_scale(y="independent")
 ```
 
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
 ## Compare GLOFAS and floodscan
 
 This is old stuff from SSD/MWI.
 That is not running atm but can maybe be used as inspiration (doesn't have to)
 
 ```python
-country_data_exploration_dir = (Path(config.DATA_DIR) /
-config.PRIVATE_DIR / "exploration" / iso3)
-floodscan_path=country_data_exploration_dir/'floodscan'/f'{iso3}_floodscan_adm2_stats.csv'
-```
-
-Read in the historical GloFAS reanalysis and floodscan data
-
-```python
-ds_glofas_reanalysis = utils.get_glofas_reanalysis(
-    country_iso3=iso3)
-```
-
-```python
-df_floodscan=pd.read_csv(floodscan_path,parse_dates=['time'])
+df_floodscan = load_floodscan()
 ```
 
 Plot out the historical streamflow against the flooded fraction from Floodscan
