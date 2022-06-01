@@ -14,7 +14,7 @@ glofas_reanalysis = GlofasReanalysis(
     country_config=constants.country_config, geo_bounding_box=geo_bounding_box
 )
 
-glofas_reanalysis.download(year_min=1998)
+glofas_reanalysis.download(year_min=1998, clobber=False)
 # when you add a new reporting point, you want to set clobber to True
-glofas_reanalysis.process(year_min=1998, clobber=False)
+glofas_reanalysis.process(year_min=1998, clobber=True)
 print(glofas_reanalysis.load())

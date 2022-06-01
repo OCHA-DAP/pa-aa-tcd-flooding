@@ -5,9 +5,30 @@ codab:
   admin_level_max: 0
 glofas:
   reporting_points:
-  - name: Ndjamena_Fort_Lamy
-    lat: 12.12
-    lon: 15.03
+  - name: Ndjamena Fort Lamy
+    lat: 12.05
+    lon: 15.05
   - name: Mailao
-    lat: 11.58
-    lon: 15.28
+    lat: 11.55
+    lon: 15.25
+  - name: Bongor
+    lat: 10.25
+    lon: 15.35
+  - name: SI001878
+    lat: 9.85
+    lon: 15.75
+  - name: Lai
+    lat: 9.35
+    lon: 16.25
+  - name: Manda
+    lat: 9.15
+    lon: 18.15
+  - name: Sarh Fort Archambault
+    lat: 9.05
+    lon: 18.45
+  - name: Bahr Aouk Golongosso
+    lat: 9.05
+    lon: 19.15
+  - name: Ouham
+    lat: 7.65
+    lon: 16.95

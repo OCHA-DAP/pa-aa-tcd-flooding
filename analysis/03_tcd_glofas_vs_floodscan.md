@@ -10,12 +10,9 @@ Just loading the data and some simple plots but real analysis still has to
 Some questions:
 
 - What is/are the best reporting point to use?
-- The Ndjamena Fort Lamy reporting point shows a max value of 45 while
-if you go to the GloFAS map explorer the return period graph shows a 1.5
- year return period value of 25000. On whose side is the bug?
 - In the impact data and from talks it is stated that 2020 is a bad year
- but from my first looks we don't see that back in GloFAS or Floodscan.
- What might be the reason?
+  but from my first looks we don't see that back in GloFAS or Floodscan.
+  What might be the reason?
 - How is the correspondence between floodscan and GloFAS?
 - How is the correspondence between these two and the impact data?
 
@@ -30,9 +27,16 @@ if you go to the GloFAS map explorer the return period graph shows a 1.5
 ```python
 import altair as alt
 import pandas as pd
+from aatoolbox import GlofasReanalysis
+from aatoolbox.utils import raster
+import matplotlib.pyplot as plt
 
-from aatoolbox import CodAB, GeoBoundingBox, GlofasReanalysis
 from src import constants
+from src.utils import load_floodscan, get_return_periods_dataframe
+```
+
+```python
+STATIONS = {"N'Djamena": "Ndjamena Fort Lamy", "Mayo-Kebbi Est": "Mailao"}
 ```
 
 ```python
@@ -46,11 +50,11 @@ glofas_reanalysis = GlofasReanalysis(
     geo_bounding_box=constants.geo_bounding_box,
 )
 
-da_glofas = glofas_reanalysis.load()
+ds_glofas = glofas_reanalysis.load()
 ```
 
 ```python
-da_glofas
+ds_glofas
 ```
 
 ```python
@@ -58,17 +62,23 @@ da_glofas
 ```
 
 ```python
-df = da_glofas.to_dataframe().reset_index()
-df = df.drop(["step", "surface", "valid_time"], axis=1)
+df_glofas = (
+    ds_glofas.to_dataframe()
+    .reset_index()
+    .drop(["step", "surface", "valid_time"], axis=1)
+)[["time"] + list(STATIONS.values())]
+df_glofas["year"] = df_glofas.time.dt.year
 ```
 
 ```python
-df
+df_glofas
 ```
 
 ```python
 # plot timeseries of two reporting points
-df_long = df.melt("time", var_name="station", value_name="discharge")
+df_long = df_glofas.drop("year", axis=1).melt(
+    "time", var_name="station", value_name="discharge"
+)
 plt_orig = (
     alt.Chart()
     .mark_line()
@@ -87,208 +97,326 @@ alt.layer(plt_orig, data=df_long).properties(
 ).facet("station:N", columns=1).resolve_scale(y="independent")
 ```
 
-```python
-
-```
-
-```python
-
-```
-
-```python
-
-```
-
 ## Compare GLOFAS and floodscan
 
-This is old stuff from SSD/MWI.
-That is not running atm but can maybe be used as inspiration (doesn't have to)
-
 ```python
-country_data_exploration_dir = (Path(config.DATA_DIR) /
-config.PRIVATE_DIR / "exploration" / iso3)
-floodscan_path=country_data_exploration_dir/'floodscan'/f'{iso3}_floodscan_adm2_stats.csv'
-```
-
-Read in the historical GloFAS reanalysis and floodscan data
-
-```python
-ds_glofas_reanalysis = utils.get_glofas_reanalysis(
-    country_iso3=iso3)
+gdf_adm1 = constants.gdf_adm1[
+    constants.gdf_adm1["admin1Name"].isin(STATIONS.keys())
+]
+gdf_adm1
 ```
 
 ```python
-df_floodscan=pd.read_csv(floodscan_path,parse_dates=['time'])
+ds_floodscan = load_floodscan()
 ```
 
-Plot out the historical streamflow against the flooded fraction from Floodscan
+```python
+ds_floodscan
+```
 
 ```python
-start_slice = '1998-01-01'
-end_slice = '2021-12-31'
+df_floodscan = (
+    ds_floodscan["SFED_AREA"]
+    .aat.compute_raster_stats(
+        gdf=gdf_adm1, feature_col="admin1Name", stats_list=["mean"]
+    )
+    .pivot(index="time", columns="admin1Name", values="mean_admin1Name")
+).reset_index()
+df_floodscan["year"] = df_floodscan.time.dt.year
+```
+
+```python
+start_slice = "1998-01-01"
+end_slice = "2021-12-31"
+
 
 def filter_event_dates(df_event, start, end):
-    return df_event[(df_event['time']<str(end)) & (df_event['time']>str(start))].reset_index()
+    return df_event[
+        (df_event["time"] < str(end)) & (df_event["time"] > str(start))
+    ].reset_index()
 
-for station in stations:
 
-    fig, axs = plt.subplots(1,
-                            figsize=(10,6 * len(stations)),
-                            squeeze=False, sharex=True, sharey=True)
-    fig.suptitle(f'Historical streamflow at {station}')
+def get_df_glofas_rp(station):
+    return get_return_periods_dataframe(
+        df_glofas[["year", station]]
+        .sort_values(station, ascending=False)
+        .drop_duplicates(["year"]),
+        method="analytical",
+        rp_var=station,
+    )
 
-    da_plt = ds_glofas_reanalysis[station].sel(time=slice(start_slice, end_slice))
+
+def get_df_floodscan_rp(adm1):
+    return get_return_periods_dataframe(
+        df_floodscan[["year", adm1]]
+        .sort_values(adm1, ascending=False)
+        .drop_duplicates(["year"]),
+        method="analytical",
+        rp_var=adm1,
+        round_rp=False,
+    )
+
+
+for adm1, station in STATIONS.items():
+
+    fig, axs = plt.subplots(
+        1,
+        figsize=(15, 6),
+        squeeze=False,
+        sharex=True,
+        sharey=True,
+    )
+    fig.suptitle(f"Historical streamflow at {station}")
+
+    da_plt = ds_glofas[station].sel(time=slice(start_slice, end_slice))
     df_floodscan_adm = filter_event_dates(
-        df_floodscan[df_floodscan.ADM2_EN==station],start_slice, end_slice)
+        df_floodscan[["time", adm1]],
+        start_slice,
+        end_slice,
+    )
 
     observations = da_plt.values
     x = da_plt.time
-
     ax = axs[0, 0]
-    ax.plot(da_plt.time, da_plt.values, c='k', lw=0.75, alpha=0.75)
-    ax.set_ylabel('Discharge [m$^3$ s$^{-1}$]')
-    ax.plot([], [], label="GloFas", color=f'black')
-    ax.plot([], [], label="Floodscan", color=f'blue')
-    ax2=ax.twinx()
-    ax2.plot(df_floodscan_adm.time,df_floodscan_adm.mean_ADM2_PCODE)
+    ax.plot(da_plt.time, da_plt.values, c="k", lw=0.75, alpha=0.75)
+    ax.set_ylabel("Discharge [m$^3$ s$^{-1}$]")
+    ax.plot([], [], label="GloFas", color=f"black")
+    ax.plot([], [], label="Floodscan", color=f"blue")
+    ax2 = ax.twinx()
+    ax2.plot(df_floodscan_adm.time, df_floodscan_adm[adm1])
     ax2.set_ylabel("Flooded fraction")
 
-#plt rp lines
-#         rp_list = [1.5, 2, 5]
-#         df_glofas_return_period = utils.get_return_periods(
-# ds_glofas_reanalysis, method='analytical')
-#         for i in range(0,len(df_event['start_date'])):
-#             ax.axvspan(np.datetime64(df_event['start_date'][i]),
-#              np.datetime64(df_event['end_date'][i]), alpha=0.25,
-# color='#3ea7f7')
-#         for irp, rp in enumerate(rp_list):
-#             ax.axhline(df_return_period.loc[rp, station],
-#                        0, 1, color=f'C{irp+1}', alpha=1, lw=0.75,
-#                        label=f'1 in {str(rp)}-year return period')
+    # plt rp lines
+    df_glofas_rp = get_df_glofas_rp(station)
+    df_floodscan_rp = get_df_floodscan_rp(adm1)
+    for rp_glofas, rp_floodscan in zip(
+        df_glofas_rp["rp"], df_floodscan_rp["rp"]
+    ):
+        ax.axhline(rp_glofas, c="k", lw=0.5)
+        ax2.axhline(rp_floodscan)
 
     ax.figure.legend()
 ```
 
-From the graph above we cannot immediately see a clear correspondence between
-the two datasources. However, we can see that the Floodscan data shows a strange
- pattern. Where it is almost always zero except for very sharp peaks. To me this
-  is a strange pattern as I would expect flooding to appear and disappear
-   more gradually.
-
-Despite that, we can see that the peak of the floodscan always comes before the
- peak of the discharge values, which is also the opposite of what I would expect.
+It looks like there could potentially be some correspondence.
 
 Next we compute the years during which the highest peaks were observed for
 Glofas and Floodscan. With the goal to see how well they correspond.
 
 ```python
-def compute_peak_rp(df,val_col):
-    df_rolling=df.sort_values('time').set_index('time').groupby(
-    'ADM2_EN',as_index=False)[val_col].rolling(
-    10,min_periods=10).mean().reset_index().rename(
-    columns={val_col:'mean_rolling'})
-    df=df.merge(df_rolling,on=['time','ADM2_EN'])
-    df['year']=df.time.dt.year
-    #get one row per adm2-year combination that saw the highest mean value
-    df_peak=df.sort_values('mean_rolling', ascending=False).drop_duplicates(['year','ADM2_EN'])
-    years = [3,5]#np.arange(1.5, 6, 0.5)
-    df_rp=df_peak[df_peak.ADM2_EN.isin(stations)].copy()
-    for adm in stations:
-        df_adm=df_peak[df_peak.ADM2_EN==adm].copy()
-        df_rps_ana=get_return_periods_dataframe(df_adm, rp_var="mean_rolling",years=years,
-                                                method="analytical",round_rp=False)
-        df_rps_emp=get_return_periods_dataframe(df_adm, rp_var="mean_rolling",years=years,
-                                                method="empirical",round_rp=False)
-        for y in years:
-            df_rp.loc[df_rp.ADM2_EN==adm,f'rp{y}']=np.where(
-            (df_adm.mean_rolling>=df_rps_emp.loc[y,'rp']),1,0)
-    return df_rp
+import xarray as xr
+import numpy as np
+from typing import List
+
+
+def get_dates_list_from_data_array(
+    da: xr.DataArray, threshold: float, min_duration: int = 1
+) -> List[np.datetime64]:
+    """
+    Given a data array of a smoothly varying quantity over time,
+    get the dates of an event occurring where the quantity crosses
+    some threshold for a specified duration. If the duration is more than
+    one timestep, then the event date is defined as the timestep when
+    the duration is reached.
+    :param da: Data array with the main quantity
+    :param threshold: Threshold >= which an event is defined
+    :param min_duration: Number of timesteps above the quantity to be
+    considered an event
+    :return: List of event dates
+    """
+    groups = get_groups_above_threshold(
+        observations=da.to_masked_array(),
+        threshold=threshold,
+        min_duration=min_duration,
+    )
+    return [da.time[group[0] + min_duration - 1].data for group in groups]
+
+
+def get_dates_list_from_dataframe(
+    df: pd.DataFrame, threshold: float, cname: str, min_duration: int = 1
+) -> List[np.datetime64]:
+    groups = get_groups_above_threshold(
+        observations=df[cname],
+        threshold=threshold,
+        min_duration=min_duration,
+    )
+    return [
+        np.datetime64(df.time[group[0] + min_duration - 1]) for group in groups
+    ]
+
+
+def get_groups_above_threshold(
+    observations: np.ndarray,
+    threshold: float,
+    min_duration: int = 1,
+    additional_condition: np.ndarray = None,
+) -> List:
+    """
+    Get indices where consecutive values are equal to or above a
+    threshold :param observations: The array of values to search for
+    groups (length N) :param threshold: The threshold above which the
+    values must be :param min_duration: The minimum group size (default
+    1) :param additional_condition: (optional) Any additional condition
+    the values must satisfy (array-like of bools, length N) :return:
+    list of arrays with indices
+    """
+    condition = observations >= threshold
+    if additional_condition is not None:
+        condition = condition & additional_condition
+    groups = np.where(np.diff(condition, prepend=False, append=False))[
+        0
+    ].reshape(-1, 2)
+    return [group for group in groups if group[1] - group[0] >= min_duration]
+
+
+def get_detection_stats(
+    true_event_dates: np.ndarray,
+    forecasted_event_dates: np.ndarray,
+    days_before_buffer: int,
+    days_after_buffer: int,
+) -> dict:
+    """
+    Give a list of true and forecasted event dates, calculate how many
+    true / false positives and false negatives occurred
+    :param true_event_dates: A list of dates when the true events occurred
+    :param forecasted_event_dates: A list of dates when the events were
+    forecasted to occur
+    :param days_before_buffer: How many days before the forecasted date the
+    true event can occur. Usually set to the lead time or a small number
+    (even 0)
+    :param days_after_buffer: How many days after the forecasted date the
+    true event can occur. Can usually be a generous number
+    like 30, since forecasting too early isn't usually an issue
+    :return: dictionary with parameters
+    """
+    df_detected = pd.DataFrame(
+        0, index=np.array(true_event_dates), columns=["detected"]
+    )
+    FP = 0
+    # Loop through the forecasted event
+    for forecasted_event in forecasted_event_dates:
+        # Calculate the offset from the true dates
+        days_offset = (true_event_dates - forecasted_event) / np.timedelta64(
+            1, "D"
+        )
+        # Calculate which true events were detected by this forecast event
+        detected = (days_offset >= -1 * days_before_buffer) & (
+            days_offset <= days_after_buffer
+        )
+        df_detected.loc[detected, "detected"] += 1
+        # If there were no detections at all, it's a FP
+        if not sum(detected):
+            FP += 1
+    return {
+        # TP is the number of true events that were detected
+        "TP": sum(df_detected["detected"] > 0),
+        # FN is the number of true events that were not detected
+        "FN": sum(df_detected["detected"] == 0),
+        "FP": FP,
+    }
+```
+
+Below we're checking the correspondance between GloFAS and
+Floodscan "events", i.e. when
+RP thresholds are crossed. The main free parameters
+are the DAYS_BEFORE/AFTER_BUFFERs,
+as these determine the window that is allowed for
+overlap to be considered a TP.
+I used 30 days on both sides since we're just
+interested in general correspondance between
+the GloFAS model and floodscan.
+
+```python
+DAYS_BEFORE_BUFFER = 30
+DAYS_AFTER_BUFFER = 30
+
+df_station_stats = pd.DataFrame(columns=["station", "rp", "TP", "FP", "FN"])
+
+for adm1, station in STATIONS.items():
+
+    forecast = ds_glofas[station].sel(time=slice(start_slice, end_slice))
+    model = filter_event_dates(
+        df_floodscan[["time", adm1]],
+        start_slice,
+        end_slice,
+    )
+
+    df_glofas_rp = get_df_glofas_rp(station)
+    df_floodscan_rp = get_df_floodscan_rp(adm1)
+
+    for rp in [1.5, 2.0, 3.0, 5.0]:
+        model_dates = get_dates_list_from_dataframe(
+            model, df_floodscan_rp.loc[rp, "rp"], adm1
+        )
+        forecast_dates = get_dates_list_from_data_array(
+            forecast, df_glofas_rp.loc[rp, "rp"]
+        )
+        detection_stats = get_detection_stats(
+            true_event_dates=model_dates,
+            forecasted_event_dates=forecast_dates,
+            days_before_buffer=DAYS_BEFORE_BUFFER,
+            days_after_buffer=DAYS_AFTER_BUFFER,
+        )
+        df_station_stats = df_station_stats.append(
+            {**{"station": station, "rp": rp}, **detection_stats},
+            ignore_index=True,
+        )
 ```
 
 ```python
-df_glofas=ds_glofas_reanalysis.to_dataframe()
-df_glofas_stations=df_glofas[stations].reset_index().melt(id_vars=["time"],
-        var_name="ADM2_EN",
-        value_name="river_discharge")
+df_station_stats
 ```
 
 ```python
-#compute years that reached 1 in 3 and 1 in 5 year return period peak
-df_glofas_rp=compute_peak_rp(
-    df_glofas_stations[df_glofas_stations.time.dt.year>=df_floodscan.time.dt.year.min()],'river_discharge')
+
+  (alt.Chart(df_station_stats.melt(["station", "rp"]))
+  .mark_line()
+    .encode(
+        x="rp:O",
+        y="value",
+        color="station",
+        strokeDash='variable'
+    )
+  ).properties(width=400)
+
+
+```
+
+The above plot shows TP, FP, and FN. Basically you want
+TP to be >> FP or FN for the model to be working well.
+Indeed TP is above the others for low RPs in Ndjamena,
+and for both low and 1-in-5 year RP in the southern region.
+
+```python
+def get_more_detection_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute precision, recall, F1, POD and FAR
+    :param df: Dataframe with columns TP, FP and FN
+    :return: Dataframe with additional stats columns
+    """
+    # Convert everything to float to avoid zero division errors
+    for q in ["TP", "FP", "FN"]:
+        df[q] = df[q].astype("float")
+    df["precision"] = df["TP"] / (df["TP"] + df["FP"])
+    df["recall"] = df["TP"] / (df["TP"] + df["FN"])
+    df["F1"] = 2 / (1 / df["precision"] + 1 / df["recall"])
+    df["POD"] = df["recall"]
+    df["FAR"] = 1 - df["precision"]
+    for q in ["TP", "FP", "FN"]:
+        df[q] = df[q].astype("int")
+    return df
+
+
+df_prf1 = get_more_detection_stats(df_station_stats.copy())
+df_prf1 = df_prf1[["station", "rp", "precision", "recall", "F1"]]
 ```
 
 ```python
-df_floodscan_rp=compute_peak_rp(df_floodscan,'mean_ADM2_PCODE')
+(
+    alt.Chart(df_prf1.melt(["station", "rp"]))
+    .mark_line()
+    .encode(x="rp:O", y="value", color="station", strokeDash="variable")
+).properties(width=400)
 ```
 
-```python
-#combine the data
-df_comb=df_glofas_rp.merge(df_floodscan_rp[['time','ADM2_EN','mean_rolling','year','rp3','rp5']],
-                   on=['year','ADM2_EN'],suffixes=("_glofas","_floodscan"))
-```
-
-```python
-#transform for plotting
-df_comb_long=pd.melt(df_comb, id_vars=['year','ADM2_EN'],
-                      value_vars=['rp3_floodscan','rp5_floodscan','rp3_glofas','rp5_glofas'])
-```
-
-```python
-#show 1 in 3 year return period years for both data sources
-alt.Chart(df_comb_long[df_comb_long.variable.isin(
-    ['rp3_floodscan','rp3_glofas'])]).mark_rect().encode(
-    x="year:N",
-    y=alt.Y("variable:N"),
-    color=alt.Color('value:N',scale=alt.Scale(range=["#D3D3D3",'red']),
-                    legend=alt.Legend(title="1 in 3 year rp"),
-                   ),
-).properties(
-    title="1 in 3 year return period years"
-)
-```
-
-```python
-#show 1 in 3 year return period years for both data sources
-alt.Chart(df_comb_long[df_comb_long.variable.isin(
-    ['rp5_floodscan','rp5_glofas'])]).mark_rect().encode(
-    x="year:N",
-    y=alt.Y("variable:N"),
-    color=alt.Color('value:N',scale=alt.Scale(range=["#D3D3D3",'red']),
-                    legend=alt.Legend(title="1 in 5 year rp"),
-                   ),
-).properties(
-    title="1 in 5 year return period years"
-)
-```
-
-```python
-df_comb_raw=df_floodscan[['time','mean_ADM2_PCODE']].merge(
-    df_glofas.reset_index()[['time','Malakal']],on='time',how='inner')
-df_comb_raw=df_comb_raw.rename(columns={"Malakal":"GloFAS","mean_ADM2_PCODE":"floodscan"})
-```
-
-Lastly, we look at the corelation between the two datasources. We also look at
-the lagged correlation, as we would expect this to be stronger.
-
-```python
-df_corr=pd.DataFrame.from_dict({t: df_comb_raw["floodscan"].corr(df_comb_raw["GloFAS"].shift(t))
-         for t in range(10)},orient="index",columns=["correlation"])#.T
-df_corr.index.name="lag (days)"
-df_corr
-```
-
-From the graphs and the pearson correlation above we can see confirmed what we
-saw in the timeseries graph. Namely, that the two datasources don't
-correspond very well.
-However, given the strange patttern in the floodscan data it is questionable
-whether this is a good comparison dataset.
-
-What is worrying nevertheless, is that we don't see a big peak in the 2021
-glofas data. Also other years, such as 2014 and 2017 no peak discharge was
- observed whereas these were years that also saw flooding in the area around
- the Nile, i.e. south-east of Malakal.
-
-```python
-
-```
+Good performance, especially for 1 in 5 year RP in Mailao.
