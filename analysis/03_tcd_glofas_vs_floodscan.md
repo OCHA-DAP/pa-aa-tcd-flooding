@@ -76,7 +76,9 @@ df_glofas
 
 ```python
 # plot timeseries of two reporting points
-df_long = df_glofas.melt("time", var_name="station", value_name="discharge")
+df_long = df_glofas.drop("year", axis=1).melt(
+    "time", var_name="station", value_name="discharge"
+)
 plt_orig = (
     alt.Chart()
     .mark_line()
