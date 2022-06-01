@@ -136,17 +136,18 @@ def filter_event_dates(df_event, start, end):
     ].reset_index()
 
 
-def get_df_glofas_rp(station):
+def get_df_glofas_rp(station, years=None):
     return get_return_periods_dataframe(
         df_glofas[["year", station]]
         .sort_values(station, ascending=False)
         .drop_duplicates(["year"]),
         method="analytical",
         rp_var=station,
+        years=years,
     )
 
 
-def get_df_floodscan_rp(adm1):
+def get_df_floodscan_rp(adm1, years=None):
     return get_return_periods_dataframe(
         df_floodscan[["year", adm1]]
         .sort_values(adm1, ascending=False)
@@ -154,6 +155,7 @@ def get_df_floodscan_rp(adm1):
         method="analytical",
         rp_var=adm1,
         round_rp=False,
+        years=years,
     )
 
 
@@ -327,6 +329,10 @@ interested in general correspondance between
 the GloFAS model and floodscan.
 
 ```python
+forecast_dates
+```
+
+```python
 DAYS_BEFORE_BUFFER = 30
 DAYS_AFTER_BUFFER = 30
 
@@ -420,3 +426,122 @@ df_prf1 = df_prf1[["station", "rp", "precision", "recall", "F1"]]
 ```
 
 Good performance, especially for 1 in 5 year RP in Mailao.
+
+## Event timeline comparison
+
+Make a plot of the events to get an idea
+if there are many repetitions per year, and if so,
+how spaced out they are
+
+```python
+# Choose an RP -- let's do 1 in 4 y
+rp = 4
+
+# Get the events and plot
+for adm1, station in STATIONS.items():
+
+    forecast = ds_glofas[station].sel(time=slice(start_slice, end_slice))
+    model = filter_event_dates(
+        df_floodscan[["time", adm1]],
+        start_slice,
+        end_slice,
+    )
+    df_glofas_rp = get_df_glofas_rp(station, years=[rp])
+    df_floodscan_rp = get_df_floodscan_rp(adm1, years=[rp])
+
+    model_dates = get_dates_list_from_dataframe(
+        model, df_floodscan_rp.loc[rp, "rp"], adm1
+    )
+    forecast_dates = get_dates_list_from_data_array(
+        forecast, df_glofas_rp.loc[rp, "rp"]
+    )
+    fig, ax = plt.subplots(figsize=(20, 4))
+    ax.plot(
+        model_dates, [1] * len(model_dates), "o", label="floodscan", alpha=0.5
+    )
+    ax.plot(
+        forecast_dates,
+        [1.1] * len(forecast_dates),
+        "^",
+        label="glofas",
+        alpha=0.5,
+    )
+    ax.set_title(adm1)
+    ax.legend()
+    ax.grid(visible=True, which="both")
+```
+
+Unfortunately there are a lof repeat events per year.
+They generally seem clustereed though, and this
+problem could likely be resolved by smoothing floodscan.
+The only big gap looks like in GloFAS at Mayo-Kebbi Est
+in 1998 and 1998. Check the data:
+
+```python
+forecast_dates
+```
+
+Indeed there is a difference of > month in 1998 and > 15 days
+in 1999.
+
+Make a plot showing the timeline with exceedance, normalized to the
+the RPs
+
+```python
+gf.where(gf < 1, np.nan)
+```
+
+```python
+# Get the events and plot
+for adm1, station in STATIONS.items():
+
+    forecast = ds_glofas[station].sel(time=slice(start_slice, end_slice))
+    model = filter_event_dates(
+        df_floodscan[["time", adm1]],
+        start_slice,
+        end_slice,
+    )
+    df_glofas_rp = get_df_glofas_rp(station, years=[rp]).loc[rp, "rp"]
+    df_floodscan_rp = get_df_floodscan_rp(adm1, years=[rp]).loc[rp, "rp"]
+    model_dates = get_dates_list_from_dataframe(model, df_floodscan_rp, adm1)
+    forecast_dates = get_dates_list_from_data_array(forecast, df_glofas_rp)
+    # Figure out which years need to be plotted
+    years = sorted(
+        list(
+            set(
+                [pd.to_datetime(d).year for d in forecast_dates]
+                + [pd.to_datetime(d).year for d in model_dates]
+            )
+        )
+    )
+    fig, axs = plt.subplots(2, len(years) // 2, figsize=(15, 8), facecolor="w")
+    fig.suptitle(adm1)
+    for year, ax in zip(years, axs.flatten()):
+        # Filter based on year, from july to october
+        plot_start = f"{year}-07-01"
+        plot_end = f"{year}-10-31"
+        gf = forecast.sel(time=slice(plot_start, plot_end)) / df_glofas_rp
+        fs = filter_event_dates(model, plot_start, plot_end)
+        fs[adm1] = fs[adm1] / df_floodscan_rp
+        # Plot general
+        ax.plot(gf.time, gf, label="glofas")
+        ax.plot(fs["time"], fs[adm1], label="floodscan", c="g")
+        # Plot RP exceedence
+        gfe = gf.where(gf > 1, np.nan)
+        fse = fs.copy()
+        fse[adm1] = np.where(fse[adm1] < 1, np.nan, fse[adm1])
+        ax.plot(gfe.time, gfe, "r", lw=2)
+        ax.plot(fse["time"], fse[adm1], "orange", lw=2, marker=".")
+        # Cleaning axes
+        ax.set_title(year)
+        ax.set_ylim(-0.05, 1.2)
+        ax.axhline(1, c="k")
+        ax.set_xticklabels([])
+        ax.set_xticks([])
+        ax.set_yticklabels([])
+        ax.set_yticks([])
+```
+
+```python
+
+```

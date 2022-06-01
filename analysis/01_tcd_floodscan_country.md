@@ -282,7 +282,7 @@ timest_rp5 = list(
 ```
 
 ```python
-#moment with max flood extent
+# moment with max flood extent
 df_floodscan_country.iloc[df_floodscan_country.mean_admin0Pcod.argmax()]
 ```
 
@@ -669,3 +669,7 @@ Questions:
  detailing impact and which provinces
 - [Images of flooding from floodlist](https://floodlist.com/africa/chad-floods-ndjamena-november-2020)
 - [UNOSAT flood extent](https://unosat-maps.web.cern.ch/TD/FL20200826TCD/UNOSAT_A3_Natural_Landscape_FL20200826TCD_20200902_20200906_Chad.pdf)
+
+```python
+
+```
