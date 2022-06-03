@@ -115,12 +115,20 @@ ds_floodscan
 ```
 
 ```python
-df_floodscan = (
-    ds_floodscan["SFED_AREA"]
-    .aat.compute_raster_stats(
-        gdf=gdf_adm1, feature_col="admin1Name", stats_list=["mean"]
-    )
-    .pivot(index="time", columns="admin1Name", values="mean_admin1Name")
+df_floodscan_orig = ds_floodscan["SFED_AREA"].aat.compute_raster_stats(
+    gdf=gdf_adm1, feature_col="admin1Name", stats_list=["mean"]
+)
+adm_col = "admin1Name"
+# compute rolling mean
+df_floodscan_orig["mean_rolling"] = (
+    df_floodscan_orig.sort_values([adm_col, "time"])
+    .groupby(adm_col, as_index=False)[f"mean_{adm_col}"]
+    .rolling(10, min_periods=10)
+    .mean()
+    .mean_admin1Name
+)
+df_floodscan = df_floodscan_orig.pivot(
+    index="time", columns="admin1Name", values="mean_rolling"
 ).reset_index()
 df_floodscan["year"] = df_floodscan.time.dt.year
 ```
@@ -141,7 +149,7 @@ def get_df_glofas_rp(station, years=None):
         df_glofas[["year", station]]
         .sort_values(station, ascending=False)
         .drop_duplicates(["year"]),
-        method="analytical",
+        method="empirical",
         rp_var=station,
         years=years,
     )
@@ -152,7 +160,7 @@ def get_df_floodscan_rp(adm1, years=None):
         df_floodscan[["year", adm1]]
         .sort_values(adm1, ascending=False)
         .drop_duplicates(["year"]),
-        method="analytical",
+        method="empirical",
         rp_var=adm1,
         round_rp=False,
         years=years,
@@ -329,10 +337,6 @@ interested in general correspondance between
 the GloFAS model and floodscan.
 
 ```python
-forecast_dates
-```
-
-```python
 DAYS_BEFORE_BUFFER = 30
 DAYS_AFTER_BUFFER = 30
 
@@ -488,7 +492,70 @@ Make a plot showing the timeline with exceedance, normalized to the
 the RPs
 
 ```python
-gf.where(gf < 1, np.nan)
+# plot the return periods by year for the two sources
+df_sources = pd.DataFrame()
+df_sources["year"] = range(1998, 2022)
+for adm1, station in STATIONS.items():
+
+    forecast = ds_glofas[station].sel(time=slice(start_slice, end_slice))
+    model = filter_event_dates(
+        df_floodscan[["time", adm1]],
+        start_slice,
+        end_slice,
+    )
+    df_glofas_rp = get_df_glofas_rp(station, years=[rp]).loc[rp, "rp"]
+    df_floodscan_rp = get_df_floodscan_rp(adm1, years=[rp]).loc[rp, "rp"]
+    model_dates = get_dates_list_from_dataframe(model, df_floodscan_rp, adm1)
+    forecast_dates = get_dates_list_from_data_array(forecast, df_glofas_rp)
+    df_sources[f"floodscan_{adm1}"] = np.where(
+        df_sources.year.isin(
+            set([pd.to_datetime(d).year for d in model_dates])
+        ),
+        True,
+        False,
+    )
+    df_sources[f"glofas_{station}"] = np.where(
+        df_sources.year.isin(
+            set([pd.to_datetime(d).year for d in forecast_dates])
+        ),
+        True,
+        False,
+    )
+df_long = df_sources.melt(
+    "year", var_name="source", value_name=f"rp_{rp}_years"
+)
+value_color_mapping = {
+    True: "red",
+    False: "#D3D3D3",
+}
+
+(
+    alt.Chart(df_long)
+    .mark_rect()
+    .encode(
+        x="year:N",
+        y=alt.Y(
+            "source:N",
+            sort=[
+                "floodscan_N'Djamena",
+                "floodscan_Mayo-Kebbi Est",
+                "glofas_Ndjamena Fort Lamy",
+                "glofas_Mailao",
+            ],
+        ),
+        color=alt.Color(
+            f"rp_{rp}_years:N",
+            scale=alt.Scale(
+                range=list(value_color_mapping.values()),
+                domain=list(value_color_mapping.keys()),
+            ),
+            legend=alt.Legend(title=f"1 in {rp} year rp"),
+        ),
+    )
+    .properties(
+        title=f"1 in {rp} year return period years of FloodScan and GloFas"
+    )
+)
 ```
 
 ```python
@@ -534,14 +601,11 @@ for adm1, station in STATIONS.items():
         ax.plot(fse["time"], fse[adm1], "orange", lw=2, marker=".")
         # Cleaning axes
         ax.set_title(year)
-        ax.set_ylim(-0.05, 1.2)
+        ax.set_ylim(-0.05, 1.5)
         ax.axhline(1, c="k")
         ax.set_xticklabels([])
         ax.set_xticks([])
         ax.set_yticklabels([])
         ax.set_yticks([])
-```
-
-```python
-
+        ax.legend()
 ```

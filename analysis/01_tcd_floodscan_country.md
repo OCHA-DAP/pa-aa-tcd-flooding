@@ -382,7 +382,16 @@ df_countrydgy
 
 ```python
 with pd.option_context("display.max_colwidth", None):
-    display(df_countryd[["date", "emergencyTypeName", "projectTitle"]])
+    display(
+        df_countryd[
+            [
+                "date",
+                "emergencyTypeName",
+                "projectTitle",
+                "totalAmountApproved",
+            ]
+        ]
+    )
 ```
 
 ### IFRC
