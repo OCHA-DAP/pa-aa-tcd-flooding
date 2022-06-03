@@ -282,6 +282,27 @@ timest_rp5 = list(
 ```
 
 ```python
+#moment with max flood extent
+df_floodscan_country.iloc[df_floodscan_country.mean_admin0Pcod.argmax()]
+```
+
+```python
+# gif of the timeseries
+# the first loop it is whacky but after that it is beautiful
+time = pnw.Player(name="time", start=0, end=122, step=7, loop_policy="loop")
+
+# select a year else it takes ages
+da_clip.sel(
+    time=(da_clip.time.dt.year == 1998)
+    & (da_clip.time.dt.month.isin([7, 8, 9, 10, 11]))
+).interactive(loc="bottom").isel(time=time).plot(
+    #     cmap="GnBu",
+    vmin=0,
+    vmax=1,
+)
+```
+
+```python
 # gif of the timeseries
 # the first loop it is whacky but after that it is beautiful
 time = pnw.Player(name="time", start=0, end=122, step=7, loop_policy="loop")
@@ -555,6 +576,87 @@ In 1998 there was no impact recorded though, which is suspicious.
 Another suspicion is that there was a substantial number of deaths
  recorded in 2006 but no people affected.
 
+### Compare sources
+
+```python
+rp = 4
+df_sources = pd.DataFrame(
+    columns=["year", "floodscan_country", "emdat", "cerf", "ifrc"]
+)
+df_sources.year = range(1998, 2022)
+```
+
+```python
+df_floodscan_rp = df_floodscan_peak[
+    df_floodscan_peak.mean_rolling >= df_rps_ana.loc[rp, "rp"]
+].sort_values("year")
+df_sources["floodscan_country"] = np.where(
+    df_sources.year.isin(df_floodscan_rp.year), True, False
+)
+```
+
+```python
+df_sources["cerf"] = np.where(
+    df_sources.year.isin(df_countrydgy.index.year), True, False
+)
+df_sources.loc[df_sources.year < 2006, "cerf"] = np.nan
+```
+
+```python
+df_emdat_worst_years = df_emdat_year[
+    ["start_year", "people_affected"]
+].sort_values(by="people_affected", ascending=False)[
+    : round(
+        (df_emdat_year.start_year.max() - df_emdat_year.start_year.min()) / rp
+    )
+]
+df_sources["emdat"] = np.where(
+    df_sources.year.isin(df_emdat_worst_years.start_year), True, False
+)
+```
+
+```python
+df_ifrc_worst_years = df_ifrc_year[
+    ["year", "Personnes affectées"]
+].sort_values(by="Personnes affectées", ascending=False)[
+    : round((df_ifrc_year.year.max() - df_ifrc_year.year.min()) / rp)
+]
+df_sources["ifrc"] = np.where(
+    df_sources.year.isin(df_ifrc_worst_years.year), True, False
+)
+df_sources.loc[df_sources.year < 2012, "ifrc"] = np.nan
+```
+
+```python
+df_long = df_sources.melt(
+    "year", var_name="source", value_name=f"rp_{rp}_years"
+)
+value_color_mapping = {
+    True: "red",
+    False: "#D3D3D3",
+    np.nan: "white",
+    #     ">=3": plt_col_red,
+    #     "white=no data": "white",
+}
+# show 1 in x year return period years for both data sources
+alt.Chart(df_long).mark_rect().encode(
+    x="year:N",
+    y=alt.Y(
+        "source:N",
+        sort=["floodscan_country", "emdat", "cerf", "ifrc"],
+    ),
+    color=alt.Color(
+        f"rp_{rp}_years:N",
+        scale=alt.Scale(
+            range=list(value_color_mapping.values()),
+            domain=list(value_color_mapping.keys()),
+            #             range=["#D3D3D3", "red"]
+        ),
+        legend=alt.Legend(title=f"1 in {rp} year rp"),
+    ),
+).properties(title=f"1 in {rp} year return period years")
+```
+
 Questions:
 
 - Why 2020 is known as big flood, which is also partly shown in impact data,
@@ -567,7 +669,3 @@ Questions:
  detailing impact and which provinces
 - [Images of flooding from floodlist](https://floodlist.com/africa/chad-floods-ndjamena-november-2020)
 - [UNOSAT flood extent](https://unosat-maps.web.cern.ch/TD/FL20200826TCD/UNOSAT_A3_Natural_Landscape_FL20200826TCD_20200902_20200906_Chad.pdf)
-
-```python
-
-```
