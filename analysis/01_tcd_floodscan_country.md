@@ -384,7 +384,16 @@ df_countrydgy
 
 ```python
 with pd.option_context("display.max_colwidth", None):
-    display(df_countryd[["date", "emergencyTypeName", "projectTitle"]])
+    display(
+        df_countryd[
+            [
+                "date",
+                "emergencyTypeName",
+                "projectTitle",
+                "totalAmountApproved",
+            ]
+        ]
+    )
 ```
 
 ### IFRC
@@ -675,3 +684,7 @@ Questions:
  detailing impact and which provinces
 - [Images of flooding from floodlist](https://floodlist.com/africa/chad-floods-ndjamena-november-2020)
 - [UNOSAT flood extent](https://unosat-maps.web.cern.ch/TD/FL20200826TCD/UNOSAT_A3_Natural_Landscape_FL20200826TCD_20200902_20200906_Chad.pdf)
+
+```python
+
+```
