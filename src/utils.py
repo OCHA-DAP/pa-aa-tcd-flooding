@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ from src import constants
 from src.datasource_extensions import (
     CERF,
     CodABExt,
+    CompareSources,
     Emdat,
     FloodScan,
     FloodScanStats,
@@ -30,6 +32,16 @@ def load_floodscan() -> xr.Dataset:
     da.NDT_SFED_AREA.attrs.pop("grid_mapping")
     da.LWMASK_AREA.attrs.pop("grid_mapping")
     return da.rio.write_crs("EPSG:4326", inplace=True)
+
+
+def get_path_compare_datasources() -> Path:
+    compsourc = CompareSources(country_config=constants.country_config)
+    return compsourc.get_exploration_filepath()
+
+
+def load_compare_datasources() -> pd.DataFrame:
+    compsourc = CompareSources(country_config=constants.country_config)
+    return compsourc.load()
 
 
 def load_emdat_exploration() -> pd.DataFrame:

@@ -58,6 +58,18 @@ class FloodScan(_DataSourceExtension):
         return xr.load_dataset(self.processed_filepath)
 
 
+class CompareSources(_DataSourceExtension):
+    _DATASOURCE_BASENAME = "comp_sources"
+    _EXPLORATION_FILENAME = "comp_sources_worst_years.csv"
+    _IS_PUBLIC = False
+
+    def get_exploration_filepath(self) -> Path:
+        return self.exploration_filepath
+
+    def load(self) -> pd.DataFrame:
+        return pd.read_csv(self.exploration_filepath, index_col=None)
+
+
 class FloodScanStats(_DataSourceExtension):
     def __init__(
         self,

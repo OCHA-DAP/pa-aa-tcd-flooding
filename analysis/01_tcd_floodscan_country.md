@@ -43,6 +43,7 @@ from src.utils import (
     load_cerf,
     load_ifrc,
     get_return_periods_dataframe,
+    get_path_compare_datasources,
 )
 ```
 
@@ -62,7 +63,7 @@ library(tidyverse)
 ## define functions
 
 ```R
-plotFloodedFraction <- function (df,y_col,facet_col){
+plotFloodedFraction <- function (df,y_col,facet_col,title){
 df %>%
 ggplot(
 aes_string(
@@ -82,10 +83,11 @@ date_labels = "%b"
 facet_wrap(
 as.formula(paste("~", facet_col)),
 scales="free_x",
-ncol=4
+ncol=5
 ) +
-ylab("Flooded fraction")+
+ylab("Flooded percentage")+
 xlab("Month")+
+labs(title = title)+
 theme_minimal()
 }
 ```
@@ -175,7 +177,7 @@ df_floodscan_country_2021 = df_floodscan_country[
 ```R magic_args="-i df_floodscan_country_2021 -w 40 -h 20 --units cm"
 df_plot <- df_floodscan_country_2021 %>%
 mutate(time = as.Date(time, format = '%Y-%m-%d'))
-plotFloodedFraction(df_plot,'mean_admin0Pcod_perc','year')
+plotFloodedFraction(df_plot,'mean_admin0Pcod_perc','year',"Flooded fraction of Chad")
 ```
 
 Next we compute the return period and check which years had a peak
@@ -282,7 +284,7 @@ timest_rp5 = list(
 ```
 
 ```python
-#moment with max flood extent
+# moment with max flood extent
 df_floodscan_country.iloc[df_floodscan_country.mean_admin0Pcod.argmax()]
 ```
 
@@ -581,7 +583,7 @@ Another suspicion is that there was a substantial number of deaths
 ```python
 rp = 4
 df_sources = pd.DataFrame(
-    columns=["year", "floodscan_country", "emdat", "cerf", "ifrc"]
+    columns=["year", "FloodScan Country", "emdat", "cerf", "ifrc"]
 )
 df_sources.year = range(1998, 2022)
 ```
@@ -590,7 +592,7 @@ df_sources.year = range(1998, 2022)
 df_floodscan_rp = df_floodscan_peak[
     df_floodscan_peak.mean_rolling >= df_rps_ana.loc[rp, "rp"]
 ].sort_values("year")
-df_sources["floodscan_country"] = np.where(
+df_sources["FloodScan Country"] = np.where(
     df_sources.year.isin(df_floodscan_rp.year), True, False
 )
 ```
@@ -631,19 +633,19 @@ df_sources.loc[df_sources.year < 2012, "ifrc"] = np.nan
 df_long = df_sources.melt(
     "year", var_name="source", value_name=f"rp_{rp}_years"
 )
+df_long = df_long.fillna("white=no data")
 value_color_mapping = {
     True: "red",
     False: "#D3D3D3",
-    np.nan: "white",
-    #     ">=3": plt_col_red,
-    #     "white=no data": "white",
+    #     np.nan: "white",
+    "white=no data": "white",
 }
 # show 1 in x year return period years for both data sources
 alt.Chart(df_long).mark_rect().encode(
     x="year:N",
     y=alt.Y(
         "source:N",
-        sort=["floodscan_country", "emdat", "cerf", "ifrc"],
+        sort=["FloodScan Country", "emdat", "cerf", "ifrc"],
     ),
     color=alt.Color(
         f"rp_{rp}_years:N",
@@ -655,6 +657,10 @@ alt.Chart(df_long).mark_rect().encode(
         legend=alt.Legend(title=f"1 in {rp} year rp"),
     ),
 ).properties(title=f"1 in {rp} year return period years")
+```
+
+```python
+# df_sources.to_csv(get_path_compare_datasources(), index=False)
 ```
 
 Questions:
