@@ -4,7 +4,9 @@ from pathlib import Path
 import pandas as pd
 import xarray as xr
 
+from src.constants import NDJAMENA2
 from src.datasources import codab, worldpop
+from src.raster import upsample_dataarray
 
 DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
 RAW_FS_HIST_S_PATH = (
@@ -21,6 +23,35 @@ PROC_FS_DIR = DATA_DIR / "private" / "processed" / "tcd" / "floodscan"
 PROC_FS_CLIP_PATH = PROC_FS_DIR / "tcd_sfed_1998_2023.nc"
 PROC_FS_EXP_PATH = PROC_FS_DIR / "tcd_flood_exposure.nc"
 PROC_FS_ADM2_PATH = PROC_FS_DIR / "tcd_adm2_count_flood_exposed.csv"
+
+
+def load_ndjamena_daily_floodscan():
+    return pd.read_csv(
+        PROC_FS_DIR / "ndjamena_fs_daily.csv", parse_dates=["time"]
+    )
+
+
+def process_ndjamena_daily_floodscan():
+    adm = codab.load_codab()
+    adm = adm[adm["ADM2_PCODE"] == NDJAMENA2]
+    fs = load_raw_tcd_floodscan()
+    fs = fs.rio.write_crs(4326)
+    fs_aoi = fs.rio.clip(adm.geometry, all_touched=True)
+    fs_aoi_up = upsample_dataarray(
+        fs_aoi, lat_dim="lat", lon_dim="lon", resolution=0.01
+    )
+    fs_aoi_up_clip = fs_aoi_up.rio.clip(adm.geometry)
+    fs_mean = (
+        fs_aoi_up_clip.mean(dim=["lat", "lon"])
+        .to_dataframe()["SFED_AREA"]
+        .reset_index()
+    )
+    for x in [1, 3, 5, 7, 9, 11, 13, 15]:
+        fs_mean[f"roll{x}"] = (
+            fs_mean["SFED_AREA"].rolling(window=x, center=True).mean()
+        )
+    filename = "ndjamena_fs_daily.csv"
+    fs_mean.to_csv(PROC_FS_DIR / filename, index=False)
 
 
 def clip_tcd_from_glb():

@@ -6,7 +6,12 @@ import pandas as pd
 import xarray as xr
 from tqdm.auto import tqdm
 
-from src.constants import NDJAMENA_LAT, NDJAMENA_LON
+from src.constants import (
+    NDJAMENA_2YRRP,
+    NDJAMENA_5YRRP,
+    NDJAMENA_LAT,
+    NDJAMENA_LON,
+)
 
 DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
 GF_REA_RAW_DIR = (
@@ -128,3 +133,57 @@ def download_reforecast_ensembles():
             except Exception as e:
                 print(f"Failed to download {year} {lt_chunk_str}")
                 print(e)
+
+
+def process_reforecast_ensembles():
+    filenames = [x for x in os.listdir(GF_REF_RAW_DIR) if "ens" in x]
+
+    dfs = []
+    for filename in tqdm(filenames):
+        filepath = GF_REF_RAW_DIR / filename
+        ds_in = xr.open_dataset(
+            filepath,
+            engine="cfgrib",
+            backend_kwargs={
+                "indexpath": "",
+            },
+        )
+        df_in = (
+            ds_in.sel(
+                latitude=NDJAMENA_LAT, longitude=NDJAMENA_LON, method="nearest"
+            )
+            .to_dataframe()[["dis24", "valid_time"]]
+            .reset_index()
+        )
+        df_in["leadtime"] = df_in["step"].dt.days
+        df_in = df_in.drop(columns=["step"])
+        dfs.append(df_in)
+
+    df = pd.concat(dfs, ignore_index=True)
+    df = df.sort_values(["time", "leadtime"])
+    filename = "ndjamena_glofas_reforecast_ens.parquet"
+    df.to_parquet(GF_PROC_DIR / filename)
+
+
+def process_reforecast_frac():
+    df = pd.read_parquet(
+        GF_PROC_DIR / "ndjamena_glofas_reforecast_ens.parquet"
+    )
+
+    df["2yr_thresh"] = df["dis24"] > NDJAMENA_2YRRP
+    df["5yr_thresh"] = df["dis24"] > NDJAMENA_5YRRP
+
+    ens = (
+        df.groupby(["time", "leadtime", "valid_time"])[
+            [x for x in df.columns if "yr_thresh" in x]
+        ]
+        .mean()
+        .reset_index()
+    )
+    filename = "ndjamena_glofas_reforecast_frac.parquet"
+    ens.to_parquet(GF_PROC_DIR / filename)
+
+
+def load_reforecast_frac():
+    filename = "ndjamena_glofas_reforecast_frac.parquet"
+    return pd.read_parquet(GF_PROC_DIR / filename)

@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.datasources import worldpop, codab, floodscan
-from src.constants import ADM1_FLOOD_EXTRA_PCODES
+from src.constants import *
 ```
 
 ```python
@@ -84,6 +84,18 @@ adm2_pop = worldpop.load_adm2_worldpop()
 exposure = floodscan.load_adm2_flood_exposures()
 exposure = exposure.merge(adm2_pop, on="ADM2_PCODE")
 exposure["frac_exposed"] = exposure["total_exposed"] / exposure["total_pop"]
+```
+
+```python
+exposure
+```
+
+```python
+exposure[exposure["ADM2_PCODE"] == NDJAMENA2].plot(x="year", y="total_exposed")
+```
+
+```python
+
 ```
 
 ```python
