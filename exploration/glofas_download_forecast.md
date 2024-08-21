@@ -26,7 +26,7 @@ from src.datasources import glofas
 ```
 
 ```python
-glofas.download_reforecast_ensembles()
+glofas.download_forecast_ensembles()
 ```
 
 ```python

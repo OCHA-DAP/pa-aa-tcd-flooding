@@ -24,6 +24,7 @@ jupyter:
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from src.datasources import floodscan, codab, glofas
 from src.constants import NDJAMENA2
@@ -193,7 +194,35 @@ fs_q
 ```
 
 ```python
-row
+seasonal = (
+    compare.groupby("dayofyear")[["roll7", "dis24"]].mean().reset_index()
+)
+```
+
+```python
+pd.to_datetime("2000-01-01")
+```
+
+```python
+seasonal["eff_date"] = pd.to_datetime(
+    seasonal["dayofyear"], format="%j", errors="coerce"
+).apply(lambda x: x.replace(year=2000))
+```
+
+```python
+ax = seasonal.plot(x="eff_date", y="roll7")
+ax.set_ylim(bottom=0)
+ax.set_ylabel("Seasonally average flooded fraction")
+ax.set_xlabel("Date of year")
+ax.set_title("Seasonal average flooded fraction of N'Djamena (2003-2023)")
+```
+
+```python
+ax = seasonal.plot(x="eff_date", y="dis24")
+ax.set_ylim(bottom=0)
+ax.set_ylabel("Seasonally average flooded fraction")
+ax.set_xlabel("Date of year")
+ax.set_title("Seasonal average flooded fraction of N'Djamena (2003-2023)")
 ```
 
 ```python

@@ -20,6 +20,9 @@ GF_REA_RAW_DIR = (
 GF_REF_RAW_DIR = (
     DATA_DIR / "public" / "raw" / "tcd" / "glofas" / "cems-glofas-reforecast"
 )
+GF_F_RAW_DIR = (
+    DATA_DIR / "public" / "raw" / "tcd" / "glofas" / "cems-glofas-forecast"
+)
 GF_PROC_DIR = DATA_DIR / "public" / "processed" / "tcd" / "glofas"
 GF_TEST_DIR = DATA_DIR / "public" / "raw" / "tcd" / "glofas" / "test"
 PITCH = 0.005
@@ -87,6 +90,48 @@ def download_reanalysis():
         client.retrieve(dataset, request, target)
 
 
+def download_forecast_ensembles():
+    if not GF_F_RAW_DIR.exists():
+        GF_F_RAW_DIR.mkdir(parents=True)
+    c = cdsapi.Client()
+    dataset = "cems-glofas-forecast"
+    leadtimes = [x * 24 for x in range(1, 31)]
+    days = [1, 5, 8, 12, 15, 19, 22, 26, 29]
+    extend_pitch = 0.005
+    for leadtime in tqdm(leadtimes):
+        filename = f"ndjamena_forecast_ens_2023_lt{leadtime}.grib"
+        save_path = GF_F_RAW_DIR / filename
+        if save_path.exists():
+            print(f"Skipping {leadtime}, already exists")
+            continue
+        try:
+            c.retrieve(
+                dataset,
+                {
+                    "system_version": ["operational"],
+                    "hydrological_model": ["lisflood"],
+                    "product_type": ["ensemble_perturbed_forecasts"],
+                    "variable": "river_discharge_in_the_last_24_hours",
+                    "year": ["2023"],
+                    "month": [f"{x:02}" for x in range(6, 12)],
+                    "day": [f"{x:02}" for x in days],
+                    "leadtime_hour": [str(leadtime)],
+                    "data_format": "grib2",
+                    "download_format": "unarchived",
+                    "area": [
+                        N + extend_pitch,
+                        W - extend_pitch,
+                        S - extend_pitch,
+                        E + extend_pitch,
+                    ],
+                },
+                save_path,
+            )
+        except Exception as e:
+            print(f"Failed to download {leadtime}")
+            print(e)
+
+
 def download_reforecast_ensembles():
     if not GF_REF_RAW_DIR.exists():
         GF_REF_RAW_DIR.mkdir(parents=True)
@@ -135,12 +180,21 @@ def download_reforecast_ensembles():
                 print(e)
 
 
-def process_reforecast_ensembles():
+def process_reforecast_ensembles(skip_lt_groups=None, verbose: bool = False):
     filenames = [x for x in os.listdir(GF_REF_RAW_DIR) if "ens" in x]
+    if skip_lt_groups is None:
+        skip_lt_groups = []
+    filenames = [
+        x
+        for x in filenames
+        if x.split("_")[-1].split(".")[0] not in skip_lt_groups
+    ]
 
     dfs = []
     for filename in tqdm(filenames):
         filepath = GF_REF_RAW_DIR / filename
+        if verbose:
+            print(f"Processing {filename}")
         ds_in = xr.open_dataset(
             filepath,
             engine="cfgrib",
@@ -163,6 +217,11 @@ def process_reforecast_ensembles():
     df = df.sort_values(["time", "leadtime"])
     filename = "ndjamena_glofas_reforecast_ens.parquet"
     df.to_parquet(GF_PROC_DIR / filename)
+
+
+def load_reforecast_ensembles():
+    filename = "ndjamena_glofas_reforecast_ens.parquet"
+    return pd.read_parquet(GF_PROC_DIR / filename)
 
 
 def process_reforecast_frac():
