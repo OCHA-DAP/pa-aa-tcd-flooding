@@ -103,11 +103,47 @@ peaks
 ```
 
 ```python
-peaks.plot.scatter(x="level_cm", y="dis24")
+peaks
 ```
 
 ```python
-peaks.plot.scatter(x="level_cm", y="days_early")
+fig, ax = plt.subplots(dpi=300)
+peaks.plot.scatter(x="level_cm", y="dis24", ax=ax)
+
+ax.axhline(
+    y=peaks["dis24"].quantile(1 - 1 / 5),
+    color="red",
+    linestyle="-",
+    linewidth=0.3,
+)
+ax.axvline(
+    x=peaks["level_cm"].quantile(1 - 1 / 5),
+    color="red",
+    linestyle="-",
+    linewidth=0.3,
+)
+
+for year, row in peaks.set_index("year").iterrows():
+    flip_years = [2011]
+    ha = "right" if year in flip_years else "left"
+    ax.annotate(
+        f" {year} ",
+        (row["level_cm"], row["dis24"]),
+        color="k",
+        fontsize=8,
+        va="center",
+        ha=ha,
+    )
+
+ax.set_ylabel("Reanalysis yearly peak (m$^3$/s)")
+ax.set_xlabel("Observational yearly peak (cm)")
+```
+
+```python
+fig, ax = plt.subplots(dpi=300)
+peaks.plot.scatter(x="level_cm", y="days_early", ax=ax)
+ax.set_ylabel("Days reanalysis peak precedes\nobservational peak")
+ax.set_xlabel("Observational yearly peak (cm)")
 ```
 
 ```python
@@ -117,15 +153,15 @@ df = df_gf.merge(df_dre)
 ```python
 for year in df["time"].dt.year.unique():
     fig, ax = plt.subplots()
-    df[df["time"].dt.year == year].set_index("time").plot(ax=ax)
+    df[df["time"].dt.year == year].set_index("time").plot(
+        y=["dis24", "level_cm"], ax=ax
+    )
     plt.show()
     plt.close()
 ```
 
 ```python
-peaks = (
-    df.groupby(df["time"].dt.year)[["dis24", "level_cm"]].max().reset_index()
-)
+df.corr().loc["dis24", "level_cm"]
 ```
 
 ```python

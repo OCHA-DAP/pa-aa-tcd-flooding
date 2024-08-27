@@ -64,7 +64,7 @@ rea_peaks.sort_values("rank")
 ```python
 rp_f = 5
 lt_min = 5
-LT_MAX = 30
+LT_MAX = 45
 
 val_col = "dis24"
 
