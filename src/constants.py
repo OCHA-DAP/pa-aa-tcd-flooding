@@ -29,6 +29,8 @@ ADM1_FLOOD_EXTRA_PCODES = ["TD18", "TD11", "TD05", "TD03", "TD16"]
 NDJAMENA_LON = 15.025
 NDJAMENA_LAT = 12.125
 
+# values for RP determined by taking a screenshot of the GloFAS Reporting
+# Points interface and looking at the pixel position of the RP lines
 # 4000 + (4 / 337) * 2000
 NDJAMENA_2YRRP = 4023.7
 # 6000 + (15 / 338) * 2000

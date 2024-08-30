@@ -133,6 +133,11 @@ def download_forecast_ensembles():
 
 
 def download_reforecast_ensembles():
+    """
+    Download reforecast ensembles for N'Djamena station.
+    Note that because of CDS API limitations, have to split requests by
+    leadtime chunks and years.
+    """
     if not GF_REF_RAW_DIR.exists():
         GF_REF_RAW_DIR.mkdir(parents=True)
     c = cdsapi.Client()
@@ -141,6 +146,10 @@ def download_reforecast_ensembles():
 
     leadtimes = [x * 24 for x in range(1, 47)]
     max_leadtime_chunk = 5
+    # split leadtimes into chunks
+    # max_leadtime_chunk size is determined manually by iterating over chunk
+    # sizes in the CDS online interface and the using largest one that
+    # doesn't result in too large of a request
     leadtime_chunks = [
         leadtimes[x : x + max_leadtime_chunk]
         for x in range(0, len(leadtimes), max_leadtime_chunk)
@@ -165,6 +174,7 @@ def download_reforecast_ensembles():
                         "product_type": ["ensemble_perturbed_reforecast"],
                         "variable": "river_discharge_in_the_last_24_hours",
                         "hyear": [f"{year}"],
+                        # only taking relevant months (June to November)
                         "hmonth": [f"{x:02}" for x in range(6, 12)],
                         "hday": [f"{x:02}" for x in range(1, 32)],
                         "leadtime_hour": [str(x) for x in leadtime_chunk],
@@ -181,6 +191,9 @@ def download_reforecast_ensembles():
 
 
 def process_reforecast_ensembles(skip_lt_groups=None, verbose: bool = False):
+    """Combine various leadtime chunk and year files from download into
+    single parquet file.
+    """
     filenames = [x for x in os.listdir(GF_REF_RAW_DIR) if "ens" in x]
     if skip_lt_groups is None:
         skip_lt_groups = []
@@ -225,6 +238,7 @@ def load_reforecast_ensembles():
 
 
 def process_reforecast_frac():
+    """Calculate fraction of ensemble members exceeding 2 and 5 year return"""
     df = pd.read_parquet(
         GF_PROC_DIR / "ndjamena_glofas_reforecast_ens.parquet"
     )
