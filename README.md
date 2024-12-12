@@ -1,6 +1,8 @@
 # Chad Anticipatory Action: flooding
 
-[![Generic badge](https://img.shields.io/badge/STATUS-UNDER%20DEVELOPMENT-%23007CE0)](https://shields.io/)
+[![Generic badge](https://img.shields.io/badge/STATUS-ENDORSED-%231EBFB3)](https://shields.io/)
+
+_Update 2024-09-28_: framework has been activated based on GloFAS forecasts.
 
 ## Background information
 
