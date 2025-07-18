@@ -8,6 +8,10 @@ from tqdm.auto import tqdm
 
 from src.constants import (
     NDJAMENA_2YRRP,
+    NDJAMENA_2YRRP_MAX,
+    NDJAMENA_2YRRP_MEAN,
+    NDJAMENA_2YRRP_MEDIAN,
+    NDJAMENA_2YRRP_MIN,
     NDJAMENA_5YRRP,
     NDJAMENA_LAT,
     NDJAMENA_LON,
@@ -244,6 +248,10 @@ def process_reforecast_frac():
     )
 
     df["2yr_thresh"] = df["dis24"] > NDJAMENA_2YRRP
+    df["2yr_thresh_max"] = df["dis24"] > NDJAMENA_2YRRP_MAX
+    df["2yr_thresh_min"] = df["dis24"] > NDJAMENA_2YRRP_MIN
+    df["2yr_thresh_mean"] = df["dis24"] > NDJAMENA_2YRRP_MEAN
+    df["2yr_thresh_median"] = df["dis24"] > NDJAMENA_2YRRP_MEDIAN
     df["5yr_thresh"] = df["dis24"] > NDJAMENA_5YRRP
 
     ens = (

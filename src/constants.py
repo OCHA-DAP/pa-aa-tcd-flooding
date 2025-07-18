@@ -32,7 +32,16 @@ NDJAMENA_LAT = 12.125
 # values for RP determined by taking a screenshot of the GloFAS Reporting
 # Points interface and looking at the pixel position of the RP lines
 # 4000 + (4 / 337) * 2000
-NDJAMENA_2YRRP = 4023.7
+# NDJAMENA_2YRRP = 4023.7
+NDJAMENA_2YRRP = 4030
+
+# min and max from analysis of the values shown in the GloFAS interface,
+# compare with the GloFAS forecast data from CDS
+NDJAMENA_2YRRP_MAX = 4165.6796875
+NDJAMENA_2YRRP_MIN = 3992.47421875
+NDJAMENA_2YRRP_MEAN = 4063.9473864746096
+NDJAMENA_2YRRP_MEDIAN = 4051.36568359375
+
 # 6000 + (15 / 338) * 2000
 NDJAMENA_5YRRP = 6088.8
 
@@ -40,3 +49,5 @@ CERF_YEARS = [2012, 2022]
 
 NDJAMENA1 = "TD18"
 NDJAMENA2 = "TD1801"
+
+MAYOKEBBIEST1 = "TD11"
