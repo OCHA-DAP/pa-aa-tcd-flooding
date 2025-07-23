@@ -33,6 +33,10 @@ GF_STATIONS = {
         "lon": 15.073,
         "lat": 10.834,
     },
+    "ndjamena": {
+        "lon": NDJAMENA_LON,
+        "lat": NDJAMENA_LAT,
+    },
 }
 
 DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
@@ -142,7 +146,7 @@ def process_glofas_reanalysis(station_name: str):
     blob_names = [
         x
         for x in stratus.list_container_blobs(name_starts_with=raw_blob_dir)
-        if x.endswith(".grib")
+        if x.endswith(".grib") and station_name in x
     ]
     dfs = []
     for blob_name in tqdm(blob_names):
@@ -198,9 +202,14 @@ def process_reanalysis():
     df.to_csv(GF_PROC_DIR / filename, index=False)
 
 
-def load_reanalysis():
+def load_reanalysis(local: bool = False):
+    """Load N'Djamena GloFAS reanalysis data."""
     filename = "ndjamena_glofas_reanalysis.csv"
-    return pd.read_csv(GF_PROC_DIR / filename, parse_dates=["time"])
+    if local:
+        filepath = Path("temp") / filename
+    else:
+        filepath = GF_PROC_DIR / filename
+    return pd.read_csv(filepath, parse_dates=["time"])
 
 
 def download_reanalysis():
