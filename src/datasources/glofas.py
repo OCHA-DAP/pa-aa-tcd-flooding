@@ -291,7 +291,7 @@ def download_reforecast_ensembles():
         GF_REF_RAW_DIR.mkdir(parents=True)
     c = cdsapi.Client()
 
-    years = range(2003, 2023)
+    years = range(2003, 2024)
 
     leadtimes = [x * 24 for x in range(1, 47)]
     max_leadtime_chunk = 5
@@ -360,9 +360,7 @@ def process_reforecast_ensembles(skip_lt_groups=None, verbose: bool = False):
         ds_in = xr.open_dataset(
             filepath,
             engine="cfgrib",
-            backend_kwargs={
-                "indexpath": "",
-            },
+            backend_kwargs={"indexpath": "", "decode_timedelta": True},
         )
         df_in = (
             ds_in.sel(

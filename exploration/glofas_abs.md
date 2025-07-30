@@ -33,6 +33,16 @@ from src.datasources import glofas
 ```
 
 ```python
+glofas.process_reforecast_ensembles(
+    verbose=True, skip_lt_groups=["lt1104-1104"]
+)
+```
+
+```python
+
+```
+
+```python
 ref_ens = glofas.load_reforecast_ensembles()
 ```
 
@@ -43,6 +53,10 @@ ref = (
     .reset_index()
 )
 ref["leadtime"] = ref["leadtime"].astype(int)
+```
+
+```python
+ref
 ```
 
 ```python
@@ -59,6 +73,10 @@ ref
 ```
 
 ```python
+ref.groupby("leadtime")["dis24"]
+```
+
+```python
 rp_a = 5
 
 rea = glofas.load_reanalysis()
@@ -69,13 +87,17 @@ rea_peaks["trigger"] = rea_peaks["dis24"] > q_rp_a
 rea_peaks["year"] = rea_peaks["time"].dt.year
 rea_peaks["cerf"] = rea_peaks["year"].isin(CERF_YEARS)
 rea_peaks["rank"] = rea_peaks["dis24"].rank(ascending=False)
-rea_peaks["rp"] = len(rea_peaks) / rea_peaks["rank"]
+rea_peaks["rp"] = (len(rea_peaks) + 1) / rea_peaks["rank"]
 rea_peaks.sort_values("rank")
 ```
 
 ```python
+rea
+```
+
+```python
 rp_f = 5
-lt_min = 5
+lt_min = 0
 
 val_col = "dis24"
 
@@ -83,8 +105,8 @@ dfs = []
 dfs_threshs = []
 
 for lt in ref["leadtime"].unique():
-    if lt < lt_min or lt >= 30:
-        continue
+    # if lt < lt_min or lt >= 30:
+    #     continue
 
     dff = ref[(ref["leadtime"] <= lt) & (ref["leadtime"] >= lt_min)]
     df_in = dff.loc[dff.groupby(dff["time"].dt.year)[val_col].idxmax()]

@@ -227,10 +227,6 @@ ax.set_xlabel("Observational yearly peak (cm)")
 ```
 
 ```python
-peaks
-```
-
-```python
 peaks["days_early"].mean()
 ```
 
