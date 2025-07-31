@@ -13,7 +13,7 @@ jupyter:
     name: pa-aa-tcd-flooding
 ---
 
-# DRE vs. GloFAS
+# DRE-GloFAS comparison
 
 ```python
 %load_ext jupyter_black
@@ -23,6 +23,7 @@ jupyter:
 
 ```python
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 from src.datasources import dre, glofas
@@ -81,6 +82,10 @@ df_gf = df_gf[~df_gf["time"].dt.year.isin(DROP_YEARS)]
 ```
 
 ```python
+df_gf
+```
+
+```python
 peaks_gf = df_gf.loc[df_gf.groupby(df_gf["time"].dt.year)["dis24"].idxmax()]
 peaks_gf["year"] = peaks_gf["time"].dt.year
 peaks_gf["rank"] = peaks_gf["dis24"].rank(ascending=False)
@@ -103,24 +108,67 @@ peaks
 ```
 
 ```python
-peaks
+19 / 5
 ```
 
 ```python
+len(peaks)
+```
+
+```python
+rp = 4
+
 fig, ax = plt.subplots(dpi=300)
-peaks.plot.scatter(x="level_cm", y="dis24", ax=ax)
+peaks.plot(
+    x="level_cm",
+    y="dis24",
+    ax=ax,
+    marker=".",
+    color="k",
+    linestyle="",
+    legend=False,
+)
 
 ax.axhline(
-    y=peaks["dis24"].quantile(1 - 1 / 5),
-    color="red",
+    y=peaks["dis24"].quantile(1 - 1 / rp),
+    color="crimson",
     linestyle="-",
     linewidth=0.3,
 )
+ax.axhspan(
+    peaks["dis24"].quantile(1 - 1 / rp),
+    10000,
+    color="crimson",
+    alpha=0.05,
+    linestyle="None",
+)
+ax.annotate(
+    f"Seuil période de retour {rp}-ans",
+    (peaks["level_cm"].min() - 20, peaks["dis24"].quantile(1 - 1 / rp)),
+    fontsize=8,
+    color="crimson",
+)
 ax.axvline(
-    x=peaks["level_cm"].quantile(1 - 1 / 5),
-    color="red",
+    x=peaks["level_cm"].quantile(1 - 1 / rp),
+    color="limegreen",
     linestyle="-",
     linewidth=0.3,
+)
+ax.axvspan(
+    peaks["level_cm"].quantile(1 - 1 / rp),
+    1000,
+    ymin=0,
+    ymax=1,
+    color="limegreen",
+    alpha=0.1,
+)
+ax.annotate(
+    f"Seuil période de retour {rp}-ans",
+    (peaks["level_cm"].quantile(1 - 1 / rp), peaks["dis24"].min() + 2000),
+    fontsize=8,
+    color="limegreen",
+    rotation=90,
+    ha="right",
 )
 
 for year, row in peaks.set_index("year").iterrows():
@@ -135,8 +183,40 @@ for year, row in peaks.set_index("year").iterrows():
         ha=ha,
     )
 
-ax.set_ylabel("Reanalysis yearly peak (m$^3$/s)")
-ax.set_xlabel("Observational yearly peak (cm)")
+ax.set_ylim(top=7000)
+ax.set_xlim(right=850)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.set_ylabel("Réanalyse (m$^3$/s)")
+ax.set_xlabel("Niveau du fleuve observationel (cm)")
+ax.set_title(
+    "Fleuve Chari à N'Djamena\nPics annuels GloFAS vs. observationnel (2003-2022)"
+)
+```
+
+```python
+dre_thresh = peaks["level_cm"].quantile(1 - 1 / 5)
+print(f"{dre_thresh=}")
+df_dre.loc[
+    df_dre[df_dre["level_cm"] >= dre_thresh]
+    .groupby(df_dre["time"].dt.year)["time"]
+    .idxmin()
+]
+```
+
+```python
+len(peaks)
+```
+
+```python
+peaks = peaks.sort_values("rp_dre")
+np.interp(750, peaks["level_cm"], peaks["rp_dre"]) * (len(peaks) + 1) / len(
+    peaks
+)
+```
+
+```python
+df_dre[df_dre["time"].dt.year == 2022].plot(x="time", y="level_cm")
 ```
 
 ```python
@@ -144,6 +224,10 @@ fig, ax = plt.subplots(dpi=300)
 peaks.plot.scatter(x="level_cm", y="days_early", ax=ax)
 ax.set_ylabel("Days reanalysis peak precedes\nobservational peak")
 ax.set_xlabel("Observational yearly peak (cm)")
+```
+
+```python
+peaks["days_early"].mean()
 ```
 
 ```python

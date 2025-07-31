@@ -1,17 +1,43 @@
 import os
 from pathlib import Path
+from typing import Literal
 
 import cdsapi
+import numpy as np
+import ocha_stratus as stratus
 import pandas as pd
 import xarray as xr
 from tqdm.auto import tqdm
 
+from src import cds_utils
 from src.constants import (
     NDJAMENA_2YRRP,
+    NDJAMENA_2YRRP_MAX,
+    NDJAMENA_2YRRP_MEAN,
+    NDJAMENA_2YRRP_MEDIAN,
+    NDJAMENA_2YRRP_MIN,
     NDJAMENA_5YRRP,
     NDJAMENA_LAT,
     NDJAMENA_LON,
+    PROJECT_PREFIX,
 )
+
+GF_STATIONS = {
+    "bongor": {
+        # note that coords are based on selecting pixel from raw GloFAS data,
+        # not from the GloFAS interface
+        "lon": 15.43,
+        "lat": 10.22,
+    },
+    "katoa": {
+        "lon": 15.073,
+        "lat": 10.834,
+    },
+    "ndjamena": {
+        "lon": NDJAMENA_LON,
+        "lat": NDJAMENA_LAT,
+    },
+}
 
 DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
 GF_REA_RAW_DIR = (
@@ -32,6 +58,124 @@ N, S, E, W = (
     NDJAMENA_LON + PITCH,
     NDJAMENA_LON - PITCH,
 )
+
+
+def get_blob_name(
+    data_type: Literal["raw", "processed"],
+    dataset: Literal["reanalysis", "reforecast", "forecast"],
+    station_name: str,
+    year: int = None,
+) -> str:
+    if year is None and data_type == "raw":
+        raise ValueError("Year must be provided for raw data")
+    if data_type == "raw":
+        return f"{PROJECT_PREFIX}/{data_type}/glofas/{dataset}/glofas_{data_type}_{dataset}_{station_name}_{year}.grib"  # noqa
+    return f"{PROJECT_PREFIX}/{data_type}/glofas/glofas_{dataset}_{station_name}.parquet"  # noqa
+
+
+def get_glofas_grid_coords(lon, lat):
+    grid_lat = np.arange(-90.025, 90, 0.05)
+    grid_lon = np.arange(-180.025, 180, 0.05)
+    nearest_lat_idx = (np.abs(grid_lat - lat)).argmin()
+    nearest_lon_idx = (np.abs(grid_lon - lon)).argmin()
+    return round(grid_lon[nearest_lon_idx], 3), round(
+        grid_lat[nearest_lat_idx], 3
+    )
+
+
+def download_glofas_reanalysis_year_to_blob(
+    year: int, station_name: str, pitch: float = 0.001, clobber: bool = False
+):
+    station = GF_STATIONS[station_name]
+    glofas_lon, glofas_lat = get_glofas_grid_coords(
+        station["lon"], station["lat"]
+    )
+    N = glofas_lat + pitch
+    S = glofas_lat
+    E = glofas_lon + pitch
+    W = glofas_lon
+    dataset = "cems-glofas-historical"
+    request = {
+        "system_version": ["version_4_0"],
+        "hydrological_model": ["lisflood"],
+        "product_type": ["consolidated"],
+        "variable": ["river_discharge_in_the_last_24_hours"],
+        "hyear": [f"{year}"],
+        "hmonth": [f"{x:02}" for x in range(1, 13)],
+        "hday": [f"{x:02}" for x in range(1, 32)],
+        "data_format": "grib2",
+        "download_format": "unarchived",
+        "area": [N, W, S, E],
+    }
+    blob_name = get_blob_name("raw", "reanalysis", station_name, year)
+    # check if blob exists
+    if not clobber and stratus.list_container_blobs(
+        name_starts_with=blob_name
+    ):
+        print(f"{blob_name} already exists in blob storage")
+        return
+    return cds_utils.download_raw_cds_api_to_blob(dataset, request, blob_name)
+
+
+def load_glofas_reanalysis_year(
+    data_type: Literal["raw", "processed"], station_name: str, year: int
+):
+    blob_name = get_blob_name(data_type, "reanalysis", station_name, year)
+    if data_type == "raw":
+        local_filepath = "temp" / Path(blob_name)
+        if local_filepath.exists():
+            return xr.load_dataset(local_filepath)
+        else:
+            blob_data = stratus.load_blob_data(blob_name)
+            print(f"Downloading {blob_name} to {local_filepath}")
+            if not local_filepath.parent.exists():
+                os.makedirs(local_filepath.parent)
+            with open(local_filepath, "wb") as file:
+                file.write(blob_data)
+            return xr.load_dataset(local_filepath)
+    elif data_type == "processed":
+        return stratus.load_parquet_from_blob(blob_name)
+
+
+def process_glofas_reanalysis(station_name: str):
+    raw_blob_dir = "/".join(
+        get_blob_name("raw", "reanalysis", station_name, year=0).split("/")[
+            :-1
+        ]
+    )
+    blob_names = [
+        x
+        for x in stratus.list_container_blobs(name_starts_with=raw_blob_dir)
+        if x.endswith(".grib") and station_name in x
+    ]
+    dfs = []
+    for blob_name in tqdm(blob_names):
+        year = int(blob_name.split(".")[0].split("_")[-1])
+        ds = load_glofas_reanalysis_year("raw", station_name, year)
+        da = ds["dis24"]
+        df_in = da.to_dataframe().reset_index()[["time", "dis24"]]
+        dfs.append(df_in)
+    df = pd.concat(dfs, ignore_index=True)
+    df = df.sort_values("time")
+    blob_name = get_blob_name("processed", "reanalysis", station_name)
+    stratus.upload_parquet_to_blob(df, blob_name)
+
+
+def download_glofas_reanalysis_to_blob(
+    station_name: str,
+    clobber: bool = False,
+    min_year: int = 1979,
+    max_year: int = 2024,
+):
+    for year in tqdm(range(min_year, max_year + 1)):
+        download_glofas_reanalysis_year_to_blob(
+            year, station_name, clobber=clobber
+        )
+
+
+def load_glofas_reanalysis(station_name: str):
+    blob_name = get_blob_name("processed", "reanalysis", station_name)
+    return stratus.load_parquet_from_blob(blob_name)
 
 
 def process_reanalysis():
@@ -58,9 +202,14 @@ def process_reanalysis():
     df.to_csv(GF_PROC_DIR / filename, index=False)
 
 
-def load_reanalysis():
+def load_reanalysis(local: bool = False):
+    """Load N'Djamena GloFAS reanalysis data."""
     filename = "ndjamena_glofas_reanalysis.csv"
-    return pd.read_csv(GF_PROC_DIR / filename, parse_dates=["time"])
+    if local:
+        filepath = Path("temp") / filename
+    else:
+        filepath = GF_PROC_DIR / filename
+    return pd.read_csv(filepath, parse_dates=["time"])
 
 
 def download_reanalysis():
@@ -142,7 +291,7 @@ def download_reforecast_ensembles():
         GF_REF_RAW_DIR.mkdir(parents=True)
     c = cdsapi.Client()
 
-    years = range(2003, 2023)
+    years = range(2003, 2024)
 
     leadtimes = [x * 24 for x in range(1, 47)]
     max_leadtime_chunk = 5
@@ -211,9 +360,7 @@ def process_reforecast_ensembles(skip_lt_groups=None, verbose: bool = False):
         ds_in = xr.open_dataset(
             filepath,
             engine="cfgrib",
-            backend_kwargs={
-                "indexpath": "",
-            },
+            backend_kwargs={"indexpath": "", "decode_timedelta": True},
         )
         df_in = (
             ds_in.sel(
@@ -244,6 +391,10 @@ def process_reforecast_frac():
     )
 
     df["2yr_thresh"] = df["dis24"] > NDJAMENA_2YRRP
+    df["2yr_thresh_max"] = df["dis24"] > NDJAMENA_2YRRP_MAX
+    df["2yr_thresh_min"] = df["dis24"] > NDJAMENA_2YRRP_MIN
+    df["2yr_thresh_mean"] = df["dis24"] > NDJAMENA_2YRRP_MEAN
+    df["2yr_thresh_median"] = df["dis24"] > NDJAMENA_2YRRP_MEDIAN
     df["5yr_thresh"] = df["dis24"] > NDJAMENA_5YRRP
 
     ens = (
