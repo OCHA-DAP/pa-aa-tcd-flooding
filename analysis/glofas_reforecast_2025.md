@@ -113,6 +113,7 @@ df_rea_startdates = (
     .rename("min_date")
     .reset_index()
 )
+df_rea_startdates["year"] = df_rea_startdates["valid_time"]
 df_rea_startdates
 ```
 
