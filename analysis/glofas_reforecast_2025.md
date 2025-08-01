@@ -614,7 +614,7 @@ def plot_trigger_years(trig_name, lang="EN"):
         if lang == "EN"
         else "Valeur maximum de réanalyse (m$^3$/s) [réanalyse GloFAS]"
     )
-    if lang == "FR":x1x1x
+    if lang == "FR":
         if trig_name == "readiness":
             trig_name_str = "de mobilisation"
         else:
