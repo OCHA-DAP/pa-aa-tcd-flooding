@@ -28,7 +28,7 @@ import pandas as pd
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import StrMethodFormatter
+from matplotlib.ticker import StrMethodFormatter, FuncFormatter
 
 from src.datasources import glofas
 ```
@@ -531,7 +531,9 @@ xmax, ymax = (
 ```
 
 ```python
-def plot_trigger_years(trig_name):
+def plot_trigger_years(trig_name, lang="EN"):
+    if lang not in ["EN", "FR"]:
+        raise ValueError("lang must be EN or FR")
     lt_max = (
         selected_max_lt if trig_name == "action" else selected_lt_max_readiness
     )
@@ -569,10 +571,13 @@ def plot_trigger_years(trig_name):
             fontweight=fontweight,
         )
 
+    thresh_str = "Threshold" if lang == "EN" else "Seuil "
     ax.axvline(selected_thresh_f, color=trig_color)
     ax.axvspan(selected_thresh_f, xmax, facecolor=trig_color, alpha=0.1)
     ax.annotate(
-        f" Threshold: {selected_thresh_f:,.0f} m$^3$/s",
+        f" {thresh_str}: {selected_thresh_f:,.0f} m$^3$/s".replace(
+            ",", " " if lang == "FR" else ","
+        ),
         (selected_thresh_f, 0),
         rotation=90,
         ha="right",
@@ -584,7 +589,11 @@ def plot_trigger_years(trig_name):
     ax.axhline(thresh_a, color=a_color)
     ax.axhspan(thresh_a, ymax, facecolor=a_color, alpha=0.1)
     ax.annotate(
-        " 4-yr RP level",
+        (
+            " 4-yr RP level"
+            if lang == "EN"
+            else " niveau période de retour 4-ans"
+        ),
         (0, thresh_a),
         ha="left",
         va="bottom",
@@ -595,20 +604,54 @@ def plot_trigger_years(trig_name):
     ax.set_xlim((0, xmax))
     ax.set_ylim((0, ymax))
 
-    ax.set_xlabel("Maximum forecasted value (m$^3$/s) [GloFAS reforecast]")
-    ax.set_ylabel("Maximum reanalysis value (m$^3$/s) [GloFAS reanalysis]")
+    ax.set_xlabel(
+        "Maximum forecasted value (m$^3$/s) [GloFAS reforecast]"
+        if lang == "EN"
+        else "Valeur maximum prévue (m$^3$/s) [re-prévision GloFAS]"
+    )
+    ax.set_ylabel(
+        "Maximum reanalysis value (m$^3$/s) [GloFAS reanalysis]"
+        if lang == "EN"
+        else "Valeur maximum de réanalyse (m$^3$/s) [réanalyse GloFAS]"
+    )
+    if lang == "FR":x1x1x
+        if trig_name == "readiness":
+            trig_name_str = "de mobilisation"
+        else:
+            trig_name_str = "d'action"
+    else:
+        trig_name_str = trig_name
     ax.set_title(
-        f"{trig_name.capitalize()} trigger historical performance\n"
+        f"{trig_name_str.capitalize()} trigger historical performance\n"
         f"Maximum leadtime: {lt_max} days\n"
         f"Return period: {rp:.1f} years"
+        if lang == "EN"
+        else f"Performance historique de déclencheur {trig_name_str}\n"
+        f"Délai maximum : {lt_max} jours\n"
+        f"Période de retour : {rp:.1f} ans".replace(".", ",")
     )
 
-    formatter = StrMethodFormatter("{x:,.0f}")
+    def french_thousands(x, _):
+        return f"{int(x):,}".replace(",", " ")
+
+    if lang == "EN":
+        formatter = StrMethodFormatter("{x:,.0f}")
+    else:
+        formatter = FuncFormatter(french_thousands)
+
     ax.yaxis.set_major_formatter(formatter)
     ax.xaxis.set_major_formatter(formatter)
 
     [ax.spines[x].set_visible(False) for x in ["top", "right"]]
     return fig, ax
+```
+
+```python
+fig, ax = plot_trigger_years("action", lang="FR")
+```
+
+```python
+fig, ax = plot_trigger_years("readiness", lang="FR")
 ```
 
 ```python
