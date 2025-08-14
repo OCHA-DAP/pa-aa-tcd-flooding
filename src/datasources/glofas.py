@@ -52,7 +52,7 @@ GF_F_RAW_DIR = (
 GF_PROC_DIR = DATA_DIR / "public" / "processed" / "tcd" / "glofas"
 GF_TEST_DIR = DATA_DIR / "public" / "raw" / "tcd" / "glofas" / "test"
 PITCH = 0.005
-N, S, E, W = (
+NDJAMENA_N, NDJAMENA_S, NDJAMENA_E, NDJAMENA_W = (
     NDJAMENA_LAT + PITCH,
     NDJAMENA_LAT - PITCH,
     NDJAMENA_LON + PITCH,
@@ -71,6 +71,19 @@ def get_blob_name(
     if data_type == "raw":
         return f"{PROJECT_PREFIX}/{data_type}/glofas/{dataset}/glofas_{data_type}_{dataset}_{station_name}_{year}.grib"  # noqa
     return f"{PROJECT_PREFIX}/{data_type}/glofas/glofas_{dataset}_{station_name}.parquet"  # noqa
+
+
+def get_coords(station_name):
+    station = GF_STATIONS[station_name]
+    glofas_lon, glofas_lat = get_glofas_grid_coords(
+        station["lon"], station["lat"]
+    )
+    pitch = 0.001
+    N = glofas_lat + pitch
+    S = glofas_lat
+    E = glofas_lon + pitch
+    W = glofas_lon
+    return [N, W, S, E]
 
 
 def get_glofas_grid_coords(lon, lat):
@@ -234,7 +247,7 @@ def download_reanalysis():
             "hday": [f"{x:02}" for x in range(1, 32)],
             "data_format": "grib2",
             "download_format": "unarchived",
-            "area": [N, W, S, E],
+            "area": [NDJAMENA_N, NDJAMENA_W, NDJAMENA_S, NDJAMENA_E],
         }
         client.retrieve(dataset, request, target)
 
@@ -268,10 +281,10 @@ def download_forecast_ensembles():
                     "data_format": "grib2",
                     "download_format": "unarchived",
                     "area": [
-                        N + extend_pitch,
-                        W - extend_pitch,
-                        S - extend_pitch,
-                        E + extend_pitch,
+                        NDJAMENA_N + extend_pitch,
+                        NDJAMENA_W - extend_pitch,
+                        NDJAMENA_S - extend_pitch,
+                        NDJAMENA_E + extend_pitch,
                     ],
                 },
                 save_path,
@@ -329,7 +342,12 @@ def download_reforecast_ensembles():
                         "leadtime_hour": [str(x) for x in leadtime_chunk],
                         "data_format": "grib",
                         "download_format": "unarchived",
-                        "area": [N, W, S, E],
+                        "area": [
+                            NDJAMENA_N,
+                            NDJAMENA_W,
+                            NDJAMENA_S,
+                            NDJAMENA_E,
+                        ],
                     },
                     save_path,
                 )

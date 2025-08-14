@@ -520,6 +520,11 @@ df_daily
 ```
 
 ```python
+max_days = 10
+[str(24 * x) for x in range(1, max_days + 1)]
+```
+
+```python
 xcol, ycol = [f"dis24_{x}" for x in ["f", "a"]]
 
 xmax, ymax = (
