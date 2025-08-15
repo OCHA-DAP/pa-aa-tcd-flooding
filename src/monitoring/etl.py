@@ -35,7 +35,7 @@ def get_glofas_forecast(
         print(f"File already exists: {forecast_blob_name}. Skipping download")
         return
     forecast_dataset = "cems-glofas-forecast"
-    max_days = 10
+    max_days = 14
     forecast_request = {
         "system_version": ["operational"],
         "hydrological_model": ["lisflood"],
@@ -71,7 +71,9 @@ def process_glofas(blob_name, data_type, station_name):
     if data_type == "glofas_forecast":
         ds = ds["dis24"].mean(dim="number")
     df = (
-        ds.assign_coords(valid_time=ds["valid_time"] - pd.Timedelta(hours=24))
+        # we are keeping the GloFAS convention as valid time being the next day
+        # because this is how the historical analysis was done
+        ds.assign_coords(valid_time=ds["valid_time"] - pd.Timedelta(hours=0))
         .to_dataframe()
         .reset_index()
     )

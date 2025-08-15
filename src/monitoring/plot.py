@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import ocha_stratus as stratus
 from matplotlib.ticker import FuncFormatter
 
-from src.constants import PROJECT_PREFIX
+from src.constants import FRENCH_MONTHS, PROJECT_PREFIX
 
 
 def combined_plots(df, glofas_thresh, save_output=True):
@@ -32,6 +32,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         glofas_update,
     )
 
+    plt.show()
     if save_output:
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png", bbox_inches="tight", dpi=300)
@@ -75,17 +76,23 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
         )
 
     # Add horizontal threshold line
+    thresh_str = f"{thresh:,.0f}".replace(",", " ")  # e.g., '1 000'
     ax.axhline(
         y=thresh,
-        color="black",
+        color="crimson",
         linestyle="--",
         linewidth=2,
-        label=f"Trigger Threshold ({thresh})",
+        label=f"Seuil ({thresh_str} m$^3$/s)",
         alpha=0.8,  # noqa
     )
 
+    def french_date_formatter(x, pos):
+        date = mdates.num2date(x)  # convert from Matplotlib's float days
+        month_str = FRENCH_MONTHS[date.strftime("%b")]
+        return f"{date.day} {month_str}"  # e.g., '5 août'
+
     # Format x-axis dates
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%B %-d"))
+    ax.xaxis.set_major_formatter(FuncFormatter(french_date_formatter))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
 
     # Format y-axis with comma separators
@@ -93,9 +100,11 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
         return f"{x:,.0f}"  # noqa
 
     ax.yaxis.set_major_formatter(FuncFormatter(format_thousands))
-    title = f"{dataset} Monitoring: {date} | Triggers = {exceeds}"
+    title = f"Suivi {dataset} : {date} | Déclenche = {exceeds}"
     ax.set_ylim(0, None)
-    ax.set_ylabel("Discharge, daily average (m$^3$ / s)", fontsize=12)
+    ax.set_ylabel("Débit, moyenne journalière (m$^3$/s)", fontsize=12)
     ax.set_title(title, fontsize=12, fontweight="bold")
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
+
+    [ax.spines[x].set_visible(False) for x in ["top", "right"]]

@@ -58,3 +58,18 @@ PROJECT_PREFIX = "pa-aa-tcd-flooding"
 
 GLOFAS_THRESH = 4542
 GLOFAS_WARNING_THRESH = 3500
+
+FRENCH_MONTHS = {
+    "Jan": "jan.",
+    "Feb": "fév.",
+    "Mar": "mars",
+    "Apr": "avr.",
+    "May": "mai",
+    "Jun": "juin",
+    "Jul": "juil.",
+    "Aug": "août",
+    "Sep": "sept.",
+    "Oct": "oct.",
+    "Nov": "nov.",
+    "Dec": "déc.",
+}
