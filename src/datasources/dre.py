@@ -7,7 +7,7 @@ import pandas as pd
 
 from src.constants import PROJECT_PREFIX
 
-DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
+DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW", ""))
 RAW_DRE_DIR = DATA_DIR / "private" / "raw" / "tcd" / "dre"
 
 

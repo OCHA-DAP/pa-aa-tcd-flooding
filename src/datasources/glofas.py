@@ -39,7 +39,7 @@ GF_STATIONS = {
     },
 }
 
-DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
+DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW", ""))
 GF_REA_RAW_DIR = (
     DATA_DIR / "public" / "raw" / "tcd" / "glofas" / "cems-glofas-historical"
 )

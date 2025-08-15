@@ -8,7 +8,7 @@ from src.constants import NDJAMENA2
 from src.datasources import codab, worldpop
 from src.raster import upsample_dataarray
 
-DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW"))
+DATA_DIR = Path(os.getenv("AA_DATA_DIR_NEW", ""))
 RAW_FS_HIST_S_PATH = (
     DATA_DIR
     / "private"
