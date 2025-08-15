@@ -3,6 +3,7 @@ import io
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import ocha_stratus as stratus
+import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
 from src.constants import FRENCH_MONTHS, PROJECT_PREFIX
@@ -32,7 +33,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         glofas_update,
     )
 
-    plt.show()
+    # plt.show()
     if save_output:
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png", bbox_inches="tight", dpi=300)
@@ -52,30 +53,25 @@ def combined_plots(df, glofas_thresh, save_output=True):
 
 
 def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
-    ax.plot(
-        df_forecast["valid_date"],
-        df_forecast["value"],
-        marker="o",
-        linestyle="-",
-        linewidth=2,
-        markersize=4,
-        label="Forecast",
-        color="blue",
-        alpha=0.8,
+    action_color = "dodgerblue"
+    mob_color = "darkorange"
+    # Ensure datetime
+    issue_date = pd.to_datetime(date)
+    df = df_forecast.copy()
+    df["valid_date"] = pd.to_datetime(df["valid_date"])
+    df["lead_days"] = (
+        df["valid_date"].dt.floor("D") - issue_date.floor("D")
+    ).dt.days
+
+    # Split into groups
+    df_action = df[
+        df["lead_days"].between(0, 10, inclusive="both")
+    ].sort_values("valid_date")
+    df_mob = df[df["lead_days"].between(0, 14, inclusive="both")].sort_values(
+        "valid_date"
     )
 
-    for _, row in df_forecast.iterrows():
-        ax.annotate(
-            f'{row["value"]:.1f}',  # noqa
-            (row["valid_date"], row["value"]),
-            textcoords="offset points",
-            xytext=(0, 10),
-            ha="center",
-            fontsize=8,
-            color="blue",
-        )
-
-    # Add horizontal threshold line
+    # Threshold line
     thresh_str = f"{thresh:,.0f}".replace(",", " ")  # e.g., '1 000'
     ax.axhline(
         y=thresh,
@@ -83,28 +79,89 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
         linestyle="--",
         linewidth=2,
         label=f"Seuil ({thresh_str} m$^3$/s)",
-        alpha=0.8,  # noqa
+        alpha=0.8,
+        zorder=1,
     )
 
+    # Helper: annotate a line's points
+    def annotate_points(df_line, color):
+        for _, row in df_line.iterrows():
+            ax.annotate(
+                f'{row["value"]:,.0f}'.replace(",", " "),
+                (row["valid_date"], row["value"]),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=8,
+                color=color,
+            )
+
+    # Plot mobilisation first (underneath), then action (on top)
+    if not df_mob.empty:
+        ax.plot(
+            df_mob["valid_date"],
+            df_mob["value"],
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            markersize=4,
+            label="Mobilisation (délai ≤ 14 jours)",
+            color=mob_color,
+            alpha=0.9,
+            zorder=2,
+        )
+        annotate_points(df_mob, mob_color)
+
+    if not df_action.empty:
+        ax.plot(
+            df_action["valid_date"],
+            df_action["value"],
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            markersize=4,
+            label="Action (délai ≤ 10 jours)",
+            color=action_color,
+            alpha=0.95,
+            zorder=3,
+        )
+        annotate_points(df_action, action_color)
+
+    # Group-specific exceed checks
+    exceeds_action = (
+        (df_action["value"] > thresh).any() if not df_action.empty else False
+    )
+    exceeds_mob = (
+        (df_mob["value"] > thresh).any() if not df_mob.empty else False
+    )
+
+    # Build title suffix
+    trig_parts = []
+    if exceeds_action:
+        trig_parts.append("action")
+    if exceeds_mob:
+        trig_parts.append("mobilisation")
+    trig_text = ", ".join(trig_parts) if trig_parts else "aucun"
+
+    # French date formatter
     def french_date_formatter(x, pos):
-        date = mdates.num2date(x)  # convert from Matplotlib's float days
-        month_str = FRENCH_MONTHS[date.strftime("%b")]
-        return f"{date.day} {month_str}"  # e.g., '5 août'
+        d = mdates.num2date(x)
+        month_str = FRENCH_MONTHS[d.strftime("%b")]
+        return f"{d.day} {month_str}"  # e.g., '5 août'
 
-    # Format x-axis dates
-    ax.xaxis.set_major_formatter(FuncFormatter(french_date_formatter))
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    ax.xaxis.set_major_formatter(FuncFormatter(french_date_formatter))
 
-    # Format y-axis with comma separators
-    def format_thousands(x, pos):
-        return f"{x:,.0f}"  # noqa
+    # Y-axis formatter with thin spaces
+    ax.yaxis.set_major_formatter(
+        FuncFormatter(lambda x, pos: f"{x:,.0f}".replace(",", " "))
+    )
 
-    ax.yaxis.set_major_formatter(FuncFormatter(format_thousands))
-    title = f"Suivi {dataset} : {date} | Déclenche = {exceeds}"
+    # Titles, labels, cosmetics
+    title = f"Suivi {dataset} : {issue_date.date()} | Déclenche = {trig_text}"
     ax.set_ylim(0, None)
     ax.set_ylabel("Débit, moyenne journalière (m$^3$/s)", fontsize=12)
     ax.set_title(title, fontsize=12, fontweight="bold")
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
-
-    [ax.spines[x].set_visible(False) for x in ["top", "right"]]
+    [ax.spines[s].set_visible(False) for s in ["top", "right"]]
