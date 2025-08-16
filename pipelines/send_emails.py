@@ -59,8 +59,15 @@ if __name__ == "__main__":
 
             msg = EmailMessage()
             msg.set_charset("utf-8")
+            # set to readiness trigger alert for readiness email only,
+            # even if action has been activated, otherwise it's confusing
+            trigger_status_for_email = (
+                "MOBILISATION ACTIVÉ"
+                if email_type == "readiness"
+                else trigger_status
+            )
             msg["Subject"] = utils.get_email_subject(
-                trigger_status, test, monitoring_date
+                trigger_status_for_email, test, monitoring_date
             )
             msg["From"] = Address(
                 "Centre de données humanitaires OCHA",
@@ -89,7 +96,7 @@ if __name__ == "__main__":
                 ocha_logo_cid=ocha_logo_cid[1:-1],
                 chart_cid=chart_cid[1:-1],  # Don't need if triggering
                 test_email=test,
-                trigger_status=trigger_status,
+                trigger_status=trigger_status_for_email,
             )
 
             text_str = html2text(html_str)
