@@ -126,11 +126,20 @@ def check_results(monitoring_date, activation=True):
         df_forecast["lead_days"].between(0, 14, inclusive="both")
     ].sort_values("valid_date")
 
-    readiness_exceeds = df_readiness.value.any() > glofas_thresh
-    action_exceeds = df_action.value.any() > glofas_thresh
+    readiness_exceeds = df_readiness.value.any() >= glofas_thresh - 5000
+    action_exceeds = df_action.value.any() >= glofas_thresh - 5000
     activations = []
     if action_exceeds:
         activations.append("action")
     if readiness_exceeds:
         activations.append("readiness")
     return activations
+
+
+def get_activations_text(activations):
+    activations_text = "NON ACTIVÉ"
+    if "readiness" in activations:
+        activations_text = "MOBILISATION ACTIVÉ"
+    if "action" in activations:
+        activations_text = "ACTION ACTIVÉ"
+    return activations_text

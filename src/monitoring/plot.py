@@ -7,6 +7,8 @@ import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
 from src.constants import FRENCH_MONTHS, PROJECT_PREFIX
+from src.monitoring import etl
+from src.monitoring.etl import get_activations_text
 
 
 def combined_plots(df, glofas_thresh, save_output=True):
@@ -21,14 +23,13 @@ def combined_plots(df, glofas_thresh, save_output=True):
     # We're taking the forecast issue date for GloFAS (not the reanalysis)
     glofas_update = df_forecast.issued_date[0].strftime("%Y-%m-%d")
 
-    glofas_exceeds = df_forecast.value.any() > glofas_thresh
-    overall_exceeds = glofas_exceeds
+    activations = etl.check_results(update_date, activation=True)
 
     forecast_subplot(
         ax,
         df_forecast,
-        glofas_exceeds,
         glofas_thresh,
+        activations,
         "GloFAS",
         glofas_update,
     )
@@ -42,9 +43,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         container_client = stratus.get_container_client(
             "projects", "dev", write=True
         )
-        blob_name = (
-            f"{PROJECT_PREFIX}/monitoring/{update_date}_{overall_exceeds}.png"
-        )
+        blob_name = f"{PROJECT_PREFIX}/monitoring/{update_date}_{bool(activations)}.png"  # noqa: E501
 
         container_client.upload_blob(
             name=blob_name, data=buffer.getvalue(), overwrite=True
@@ -53,7 +52,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         buffer.close()
 
 
-def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
+def forecast_subplot(ax, df_forecast, thresh, activations, dataset, date):
     action_color = "dodgerblue"
     readiness_color = "darkorange"
     # Ensure datetime
@@ -128,24 +127,6 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
         )
         annotate_points(df_action, action_color)
 
-    # Group-specific exceed checks
-    exceeds_action = (
-        (df_action["value"] >= thresh).any() if not df_action.empty else False
-    )
-    exceeds_readiness = (
-        (df_readiness["value"] >= thresh).any()
-        if not df_readiness.empty
-        else False
-    )
-
-    # Build title suffix
-    trig_parts = []
-    if exceeds_readiness:
-        trig_parts.append("mobilisation")
-    if exceeds_action:
-        trig_parts.append("action")
-    trig_text = ", ".join(trig_parts) if trig_parts else "aucun"
-
     # French date formatter
     def french_date_formatter(x, pos):
         d = mdates.num2date(x)
@@ -160,8 +141,12 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
         FuncFormatter(lambda x, pos: f"{x:,.0f}".replace(",", " "))
     )
 
+    activations_text = get_activations_text(activations)
+
     # Titles, labels, cosmetics
-    title = f"Suivi {dataset} : {issue_date.date()} | Déclenche = {trig_text}"
+    title = (
+        f"Suivi {dataset} : {issue_date.date()} | Statut = {activations_text}"
+    )
     ax.set_ylim(0, None)
     ax.set_ylabel("Débit, moyenne journalière (m$^3$/s)", fontsize=12)
     ax.set_title(title, fontsize=12, fontweight="bold")

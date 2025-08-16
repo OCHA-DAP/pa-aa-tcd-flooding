@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 blob_client = stratus.get_container_client().get_blob_client(
                     blob_name
                 )
-                blob_client.download_blob().download_to_stream(image_data)
+                blob_client.download_blob().readinto(image_data)
                 image_data.seek(0)
                 msg.get_payload()[1].add_related(
                     image_data.read(), "image", "png", cid=chart_cid
