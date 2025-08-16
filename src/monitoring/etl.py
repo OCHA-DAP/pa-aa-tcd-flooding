@@ -112,10 +112,25 @@ def check_results(monitoring_date, activation=True):
     assert df.monitoring_date.nunique() == 1
 
     df_forecast = df[df.src.str.contains("glofas_forecast")].reset_index()
-    df_reanalysis = df[df.src.str.contains("glofas_reanalysis")].reset_index()
+    for col in ["issued_date", "valid_date"]:
+        df_forecast[col] = pd.to_datetime(df_forecast[col])
+    df_forecast["lead_days"] = (
+        df_forecast["valid_date"].dt.floor("D")
+        - df_forecast["issued_date"].dt.floor("D")
+    ).dt.days
 
-    glofas_exceeds = (df_reanalysis.value.any() > glofas_thresh) | (
-        df_forecast.value.any() > glofas_thresh
-    )
-    overall_exceeds = glofas_exceeds
-    return overall_exceeds
+    df_action = df_forecast[
+        df_forecast["lead_days"].between(0, 10, inclusive="both")
+    ].sort_values("valid_date")
+    df_readiness = df_forecast[
+        df_forecast["lead_days"].between(0, 14, inclusive="both")
+    ].sort_values("valid_date")
+
+    readiness_exceeds = df_readiness.value.any() > glofas_thresh
+    action_exceeds = df_action.value.any() > glofas_thresh
+    activations = []
+    if action_exceeds:
+        activations.append("action")
+    if readiness_exceeds:
+        activations.append("readiness")
+    return activations

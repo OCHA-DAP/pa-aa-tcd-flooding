@@ -58,8 +58,10 @@ def is_valid_email(email):
         return False
 
 
-def get_plot_blob_name(issue_time, trigger_status):
-    return f"{PROJECT_PREFIX}/monitoring/{issue_time}_{trigger_status}.png"
+def get_plot_blob_name(issue_time, trigger_status_bool):
+    return (
+        f"{PROJECT_PREFIX}/monitoring/{issue_time}_{trigger_status_bool}.png"
+    )
 
 
 def send_email(msg, to_list, cc_list):
@@ -76,8 +78,7 @@ def send_email(msg, to_list, cc_list):
 
 def get_email_subject(trigger_status, test, monitoring_date):
     test_text = "TEST : " if test else ""
-    trigger_text = "ACTIVÉ" if trigger_status else "PAS ACTIVÉ"
     return (
         f"{test_text} Action antipatoire Tchad : inondations fluviales"
-        f" - {trigger_text} {monitoring_date}"
+        f" - {trigger_status} {monitoring_date}"
     )

@@ -10,7 +10,7 @@ from src.constants import FRENCH_MONTHS, PROJECT_PREFIX
 
 
 def combined_plots(df, glofas_thresh, save_output=True):
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(12, 6))
 
     # TODO: Some duplication here from etl.check_results
     assert df.monitoring_date.nunique() == 1
@@ -33,6 +33,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         glofas_update,
     )
 
+    # uncomment below to see plot for local debugging
     # plt.show()
     if save_output:
         buffer = io.BytesIO()
@@ -54,7 +55,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
 
 def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
     action_color = "dodgerblue"
-    mob_color = "darkorange"
+    readiness_color = "darkorange"
     # Ensure datetime
     issue_date = pd.to_datetime(date)
     df = df_forecast.copy()
@@ -67,9 +68,9 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
     df_action = df[
         df["lead_days"].between(0, 10, inclusive="both")
     ].sort_values("valid_date")
-    df_mob = df[df["lead_days"].between(0, 14, inclusive="both")].sort_values(
-        "valid_date"
-    )
+    df_readiness = df[
+        df["lead_days"].between(0, 14, inclusive="both")
+    ].sort_values("valid_date")
 
     # Threshold line
     thresh_str = f"{thresh:,.0f}".replace(",", " ")  # e.g., '1 000'
@@ -97,20 +98,20 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
             )
 
     # Plot mobilisation first (underneath), then action (on top)
-    if not df_mob.empty:
+    if not df_readiness.empty:
         ax.plot(
-            df_mob["valid_date"],
-            df_mob["value"],
+            df_readiness["valid_date"],
+            df_readiness["value"],
             marker="o",
             linestyle="-",
             linewidth=2,
             markersize=4,
             label="Mobilisation (délai ≤ 14 jours)",
-            color=mob_color,
+            color=readiness_color,
             alpha=0.9,
             zorder=2,
         )
-        annotate_points(df_mob, mob_color)
+        annotate_points(df_readiness, readiness_color)
 
     if not df_action.empty:
         ax.plot(
@@ -129,18 +130,20 @@ def forecast_subplot(ax, df_forecast, exceeds, thresh, dataset, date):
 
     # Group-specific exceed checks
     exceeds_action = (
-        (df_action["value"] > thresh).any() if not df_action.empty else False
+        (df_action["value"] >= thresh).any() if not df_action.empty else False
     )
-    exceeds_mob = (
-        (df_mob["value"] > thresh).any() if not df_mob.empty else False
+    exceeds_readiness = (
+        (df_readiness["value"] >= thresh).any()
+        if not df_readiness.empty
+        else False
     )
 
     # Build title suffix
     trig_parts = []
+    if exceeds_readiness:
+        trig_parts.append("mobilisation")
     if exceeds_action:
         trig_parts.append("action")
-    if exceeds_mob:
-        trig_parts.append("mobilisation")
     trig_text = ", ".join(trig_parts) if trig_parts else "aucun"
 
     # French date formatter

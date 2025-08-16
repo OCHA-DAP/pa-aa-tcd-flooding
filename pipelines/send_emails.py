@@ -29,86 +29,97 @@ if __name__ == "__main__":
 
     monitoring_date_obj = datetime.strptime(monitoring_date, "%Y-%m-%d")
 
-    activation = etl.check_results(monitoring_date, activation=True)
-    warning = etl.check_results(monitoring_date, activation=False)
-    trigger_status = "ACTIVÉ" if activation else "NON ACTIVÉ"
+    activations = etl.check_results(monitoring_date, activation=True)
+    warnings = etl.check_results(monitoring_date, activation=False)
+    trigger_status = "NON ACTIVÉ"
+    if "readiness" in activations:
+        trigger_status = "MOBILISATION ACTIVÉ"
+    if "action" in activations:
+        trigger_status = "ACTION ACTIVÉ"
 
     # Send emails if activated, if within warning threshold,
     # or if it is a Monday, or if testing
-    if activation or warning or monitoring_date_obj.weekday() == 0 or test:
+    if activations or warnings or monitoring_date_obj.weekday() == 0 or test:
         print(f"Sending emails for date: {monitoring_date}")
+        # always send informational, but only send trigger when triggering
+        for email_type in activations + ["informational"]:
+            print(f"Sending {email_type} email")
+            ocha_logo_cid = make_msgid(domain="humdata.org")
+            chart_cid = make_msgid(domain="humdata.org")
 
-        ocha_logo_cid = make_msgid(domain="humdata.org")
-        chart_cid = make_msgid(domain="humdata.org")
+            environment = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+            template = environment.get_template(f"{email_type}.html")
 
-        template_name = "action" if activation else "informational"
-        environment = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-        template = environment.get_template(f"{template_name}.html")
-
-        email_type = "info" if not activation else "trigger"
-        distribution = utils.process_distribution_list(test, email_type)
-
-        msg = EmailMessage()
-        msg.set_charset("utf-8")
-        msg["Subject"] = utils.get_email_subject(
-            activation, test, monitoring_date
-        )
-        msg["From"] = Address(
-            "Centre de données humanitaires OCHA",
-            utils.EMAIL_ADDRESS.split("@")[0],
-            utils.EMAIL_ADDRESS.split("@")[1],
-        )
-        msg["To"] = [
-            Address(
-                row["name"],
-                row["email"].split("@")[0],
-                row["email"].split("@")[1],
+            distribution_list_name = (
+                "info" if email_type == "informational" else "trigger"
             )
-            for _, row in distribution["to"].iterrows()
-        ]
-        msg["Cc"] = [
-            Address(
-                row["name"],
-                row["email"].split("@")[0],
-                row["email"].split("@")[1],
-            )
-            for _, row in distribution["cc"].iterrows()
-        ]
-
-        html_str = template.render(
-            pub_date=monitoring_date,
-            ocha_logo_cid=ocha_logo_cid[1:-1],
-            chart_cid=chart_cid[1:-1],  # Don't need if triggering
-            test_email=test,
-            trigger_status=trigger_status,
-        )
-
-        text_str = html2text(html_str)
-        msg.set_content(text_str)
-        msg.add_alternative(html_str, subtype="html")
-
-        if not activation:
-            blob_name = utils.get_plot_blob_name(monitoring_date, activation)
-            image_data = io.BytesIO()
-            blob_client = stratus.get_container_client().get_blob_client(
-                blob_name
-            )
-            blob_client.download_blob().download_to_stream(image_data)
-            image_data.seek(0)
-            msg.get_payload()[1].add_related(
-                image_data.read(), "image", "png", cid=chart_cid
+            distribution = utils.process_distribution_list(
+                test, distribution_list_name
             )
 
-        for filename, cid in zip(
-            ["ocha_logo_wide.png"],
-            [ocha_logo_cid],
-        ):
-            img_path = STATIC_DIR / filename
-            with open(img_path, "rb") as img:
+            msg = EmailMessage()
+            msg.set_charset("utf-8")
+            msg["Subject"] = utils.get_email_subject(
+                trigger_status, test, monitoring_date
+            )
+            msg["From"] = Address(
+                "Centre de données humanitaires OCHA",
+                utils.EMAIL_ADDRESS.split("@")[0],
+                utils.EMAIL_ADDRESS.split("@")[1],
+            )
+            msg["To"] = [
+                Address(
+                    row["name"],
+                    row["email"].split("@")[0],
+                    row["email"].split("@")[1],
+                )
+                for _, row in distribution["to"].iterrows()
+            ]
+            msg["Cc"] = [
+                Address(
+                    row["name"],
+                    row["email"].split("@")[0],
+                    row["email"].split("@")[1],
+                )
+                for _, row in distribution["cc"].iterrows()
+            ]
+
+            html_str = template.render(
+                pub_date=monitoring_date,
+                ocha_logo_cid=ocha_logo_cid[1:-1],
+                chart_cid=chart_cid[1:-1],  # Don't need if triggering
+                test_email=test,
+                trigger_status=trigger_status,
+            )
+
+            text_str = html2text(html_str)
+            msg.set_content(text_str)
+            msg.add_alternative(html_str, subtype="html")
+
+            if email_type == "informational":
+                blob_name = utils.get_plot_blob_name(
+                    monitoring_date, bool(activations)
+                )
+                image_data = io.BytesIO()
+                blob_client = stratus.get_container_client().get_blob_client(
+                    blob_name
+                )
+                blob_client.download_blob().download_to_stream(image_data)
+                image_data.seek(0)
                 msg.get_payload()[1].add_related(
-                    img.read(), "image", "png", cid=cid
+                    image_data.read(), "image", "png", cid=chart_cid
                 )
 
-        utils.send_email(msg, distribution["to"], distribution["cc"])
+            for filename, cid in zip(
+                ["ocha_logo_wide.png"],
+                [ocha_logo_cid],
+            ):
+                img_path = STATIC_DIR / filename
+                with open(img_path, "rb") as img:
+                    msg.get_payload()[1].add_related(
+                        img.read(), "image", "png", cid=cid
+                    )
+
+            utils.send_email(msg, distribution["to"], distribution["cc"])
     else:
         print(f"Not sending email. Trigger status is {trigger_status}")
