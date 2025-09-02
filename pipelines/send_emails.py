@@ -12,6 +12,7 @@ from html2text import html2text
 from jinja2 import Environment, FileSystemLoader
 
 from src.monitoring import etl, utils
+from src.monitoring.utils import find_bad_transition
 
 load_dotenv()
 
@@ -126,7 +127,8 @@ if __name__ == "__main__":
                     msg.get_payload()[1].add_related(
                         img.read(), "image", "png", cid=cid
                     )
-
+            # check for non-breaking commas inserted into email header
+            find_bad_transition(distribution["to"], distribution["cc"])
             utils.send_email(msg, distribution["to"], distribution["cc"])
     else:
         print(f"Not sending email. Trigger status is {trigger_status}")
