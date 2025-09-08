@@ -38,6 +38,8 @@ if __name__ == "__main__":
     # --- 3. Combine and save to database...
     df_all = pd.concat([df_forecast])
     df_all["monitoring_date"] = update_date
+    print("Dataframe to be saved to database:")
+    print(df_all)
     engine = stratus.get_engine(stage="dev", write=True)
     df_all.to_sql(
         etl.DB_TABLE,  # This table was created manually
