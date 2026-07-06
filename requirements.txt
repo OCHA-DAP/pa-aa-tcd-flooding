@@ -3,11 +3,12 @@ cfgrib==0.9.14.0
 dask==2025.5.1
 eccodes==2.42.0
 geopandas==1.1.1
-html2text==2025.4.15
+Jinja2
 matplotlib==3.8.3
 netCDF4==1.6.5
 numpy
 ocha_stratus==0.1.4
+ocha-relay @ git+https://github.com/OCHA-DAP/ocha-relay.git@v0.3.0
 pandas==2.3.1
 pyarrow
 python-dotenv
