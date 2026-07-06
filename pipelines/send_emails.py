@@ -17,7 +17,6 @@ from src.monitoring import etl, utils
 
 load_dotenv()
 
-STATIC_DIR = Path("src/monitoring/email/static/")
 TEMPLATES_DIR = Path("src/monitoring/email/templates/")
 STAGE = os.getenv("STAGE", "dev")
 
@@ -42,10 +41,6 @@ if __name__ == "__main__":
     if activations or warnings or monitoring_date_obj.weekday() == 0 or test:
         print(f"Sending emails for date: {monitoring_date}")
         client = ListmonkClient.from_env()
-
-        with open(STATIC_DIR / "ocha_logo_wide.png", "rb") as f:
-            ocha_logo_url = client.upload_media(f.read(), "ocha_logo_wide.png")
-
         environment = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 
         for email_type in activations + ["informational"]:
@@ -83,19 +78,16 @@ if __name__ == "__main__":
             template = environment.get_template(f"{email_type}.html")
             html_str = template.render(
                 pub_date=monitoring_date,
-                ocha_logo_url=ocha_logo_url,
                 chart_url=chart_url,
-                test_email=test,
                 trigger_status=trigger_status_for_email,
             )
 
             subject = utils.get_email_subject(
                 trigger_status_for_email, test, monitoring_date
             )
-            prefix = "[TEST] " if test else ""
-            campaign_name = (
-                f"{prefix}tcd-flooding-{email_type}-{monitoring_date}"
-            )
+            test_prefix = "[TEST] " if test else ""
+            slug = f"[FR] tcd-flooding-{email_type}-{monitoring_date}"
+            campaign_name = test_prefix + slug
 
             campaign_id = client.create_campaign(
                 name=campaign_name,
