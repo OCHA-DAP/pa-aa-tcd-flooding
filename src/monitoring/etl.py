@@ -87,13 +87,11 @@ def get_database_forecast(monitoring_date):
     engine = stratus.get_engine(stage="dev")
     with engine.connect() as con:
         df = pd.read_sql(
-            text(
-                f"""
+            text(f"""
             select * from {DB_SCHEMA}.{DB_TABLE}
             where monitoring_date = :monitoring_date
             order by valid_date
-            """
-            ),
+            """),
             con=con,
             params={"monitoring_date": monitoring_date},
         )
@@ -126,8 +124,8 @@ def check_results(monitoring_date, activation=True):
         df_forecast["lead_days"].between(0, 14, inclusive="both")
     ].sort_values("valid_date")
 
-    readiness_exceeds = df_readiness.value.any() >= glofas_thresh
-    action_exceeds = df_action.value.any() >= glofas_thresh
+    readiness_exceeds = (df_readiness.value >= glofas_thresh).any()
+    action_exceeds = (df_action.value >= glofas_thresh).any()
     activations = []
     if action_exceeds:
         activations.append("action")

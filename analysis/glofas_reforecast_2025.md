@@ -64,7 +64,9 @@ def calculate_one_group_rp(group, col_name: str = "q", ascending: bool = True):
 ### Reanalysis
 
 ```python
-df_rea = glofas.load_reanalysis().rename(columns={"time": "valid_time"})
+df_rea = glofas.load_reanalysis(local=True).rename(
+    columns={"time": "valid_time"}
+)
 ```
 
 ```python
@@ -146,7 +148,7 @@ target_years
 ## Reforecast
 
 ```python
-df_ref_ens = glofas.load_reforecast_ensembles()
+df_ref_ens = glofas.load_reforecast_ensembles(local=True)
 df_ref_ens = df_ref_ens.rename(columns={"time": "issued_time"})
 ```
 
@@ -497,20 +499,20 @@ This plot looks more or less as expected. The return period drops as we include 
 selected_lt_max_readiness = 14
 ```
 
-We can then just double check that these thresholds are correct, based on the daily data. We expect 5 trigger years for action and 7 for readiness.
+We can then just double check that these thresholds are correct, based on the daily data. We expect 5 trigger years for action and 7 for readiness. We can also check the historical trigger dates.
 
 ```python
 df_ref_ens_mean[
     (df_ref_ens_mean["dis24"] >= selected_thresh_f)
     & (df_ref_ens_mean["leadtime"] <= selected_max_lt)
-]["valid_time"].dt.year.unique()
+].groupby(df_ref_ens_mean["issued_time"].dt.year)["issued_time"].min()
 ```
 
 ```python
 df_ref_ens_mean[
     (df_ref_ens_mean["dis24"] >= selected_thresh_f)
     & (df_ref_ens_mean["leadtime"] <= selected_lt_max_readiness)
-]["valid_time"].dt.year.unique()
+].groupby(df_ref_ens_mean["issued_time"].dt.year)["issued_time"].min()
 ```
 
 ## Plot peformance

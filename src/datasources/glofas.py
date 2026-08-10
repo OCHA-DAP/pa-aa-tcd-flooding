@@ -397,9 +397,13 @@ def process_reforecast_ensembles(skip_lt_groups=None, verbose: bool = False):
     df.to_parquet(GF_PROC_DIR / filename)
 
 
-def load_reforecast_ensembles():
+def load_reforecast_ensembles(local: bool = False):
     filename = "ndjamena_glofas_reforecast_ens.parquet"
-    return pd.read_parquet(GF_PROC_DIR / filename)
+    if local:
+        filepath = Path("temp") / filename
+    else:
+        filepath = GF_PROC_DIR / filename
+    return pd.read_parquet(filepath)
 
 
 def process_reforecast_frac():

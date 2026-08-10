@@ -1,22 +1,22 @@
 import io
 import os
 from datetime import datetime
-from email.headerregistry import Address
-from email.message import EmailMessage
-from email.utils import make_msgid
 from pathlib import Path
 
 import ocha_stratus as stratus
 from dotenv import load_dotenv
-from html2text import html2text
 from jinja2 import Environment, FileSystemLoader
+from ocha_relay.listmonk import ListmonkClient
 
+from src.constants import (
+    LISTMONK_INFO_LIST_ID,
+    LISTMONK_TEST_LIST_ID,
+    LISTMONK_TRIGGER_LIST_ID,
+)
 from src.monitoring import etl, utils
-from src.monitoring.utils import find_bad_transition
 
 load_dotenv()
 
-STATIC_DIR = Path("src/monitoring/email/static/")
 TEMPLATES_DIR = Path("src/monitoring/email/templates/")
 STAGE = os.getenv("STAGE", "dev")
 
@@ -38,72 +38,22 @@ if __name__ == "__main__":
     if "action" in activations:
         trigger_status = "ACTION ACTIVÉ"
 
-    # Send emails if activated, if within warning threshold,
-    # or if it is a Monday, or if testing
     if activations or warnings or monitoring_date_obj.weekday() == 0 or test:
         print(f"Sending emails for date: {monitoring_date}")
-        # always send informational, but only send trigger when triggering
+        client = ListmonkClient.from_env()
+        environment = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+
         for email_type in activations + ["informational"]:
             print(f"Sending {email_type} email")
-            ocha_logo_cid = make_msgid(domain="humdata.org")
-            chart_cid = make_msgid(domain="humdata.org")
 
-            environment = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
-            template = environment.get_template(f"{email_type}.html")
+            if test:
+                list_id = LISTMONK_TEST_LIST_ID
+            elif email_type == "informational":
+                list_id = LISTMONK_INFO_LIST_ID
+            else:
+                list_id = LISTMONK_TRIGGER_LIST_ID
 
-            distribution_list_name = (
-                "info" if email_type == "informational" else "trigger"
-            )
-            distribution = utils.process_distribution_list(
-                test, distribution_list_name
-            )
-
-            msg = EmailMessage()
-            msg.set_charset("utf-8")
-            # set to readiness trigger alert for readiness email only,
-            # even if action has been activated, otherwise it's confusing
-            trigger_status_for_email = (
-                "MOBILISATION ACTIVÉ"
-                if email_type == "readiness"
-                else trigger_status
-            )
-            msg["Subject"] = utils.get_email_subject(
-                trigger_status_for_email, test, monitoring_date
-            )
-            msg["From"] = Address(
-                "Centre de données humanitaires OCHA",
-                utils.EMAIL_ADDRESS.split("@")[0],
-                utils.EMAIL_ADDRESS.split("@")[1],
-            )
-            msg["To"] = [
-                Address(
-                    row["name"],
-                    row["email"].split("@")[0],
-                    row["email"].split("@")[1],
-                )
-                for _, row in distribution["to"].iterrows()
-            ]
-            msg["Cc"] = [
-                Address(
-                    row["name"],
-                    row["email"].split("@")[0],
-                    row["email"].split("@")[1],
-                )
-                for _, row in distribution["cc"].iterrows()
-            ]
-
-            html_str = template.render(
-                pub_date=monitoring_date,
-                ocha_logo_cid=ocha_logo_cid[1:-1],
-                chart_cid=chart_cid[1:-1],  # Don't need if triggering
-                test_email=test,
-                trigger_status=trigger_status_for_email,
-            )
-
-            text_str = html2text(html_str)
-            msg.set_content(text_str)
-            msg.add_alternative(html_str, subtype="html")
-
+            chart_url = None
             if email_type == "informational":
                 blob_name = utils.get_plot_blob_name(
                     monitoring_date, bool(activations)
@@ -114,21 +64,38 @@ if __name__ == "__main__":
                 )
                 blob_client.download_blob().readinto(image_data)
                 image_data.seek(0)
-                msg.get_payload()[1].add_related(
-                    image_data.read(), "image", "png", cid=chart_cid
+                chart_url = client.upload_media(
+                    image_data.read(),
+                    f"tcd-flooding-{monitoring_date}.png",
                 )
 
-            for filename, cid in zip(
-                ["ocha_logo_wide.png"],
-                [ocha_logo_cid],
-            ):
-                img_path = STATIC_DIR / filename
-                with open(img_path, "rb") as img:
-                    msg.get_payload()[1].add_related(
-                        img.read(), "image", "png", cid=cid
-                    )
-            # check for non-breaking commas inserted into email header
-            find_bad_transition(distribution["to"], distribution["cc"])
-            utils.send_email(msg, distribution["to"], distribution["cc"])
+            trigger_status_for_email = (
+                "MOBILISATION ACTIVÉ"
+                if email_type == "readiness"
+                else trigger_status
+            )
+
+            template = environment.get_template(f"{email_type}.html")
+            html_str = template.render(
+                pub_date=monitoring_date,
+                chart_url=chart_url,
+                trigger_status=trigger_status_for_email,
+            )
+
+            subject = utils.get_email_subject(
+                trigger_status_for_email, test, monitoring_date
+            )
+            test_prefix = "[TEST] " if test else ""
+            slug = f"[FR] tcd-flooding-{email_type}-{monitoring_date}"
+            campaign_name = test_prefix + slug
+
+            campaign_id = client.create_campaign(
+                name=campaign_name,
+                subject=subject,
+                body=html_str,
+                list_ids=[list_id],
+            )
+            client.send_campaign(campaign_id, skip_confirmation=True)
+            print(f"Sent {email_type} campaign (id={campaign_id})")
     else:
         print(f"Not sending email. Trigger status is {trigger_status}")
