@@ -49,7 +49,9 @@ jobs:
         DSCI_AZ_DB_DEV_HOST: ${{ secrets.DSCI_AZ_DB_DEV_HOST}}
         CDSAPI_KEY: ${{ secrets.CDSAPI_KEY}}
         CDSAPI_URL: ${{ secrets.CDSAPI_URL}}
-        DSCI_LISTMONK_BASE_URL: ${{ secrets.DSCI_LISTMONK_BASE_URL}}
+        # org secret DSCI_LISTMONK_BASE_URL is not visible to this public repo;
+        # the legacy DSCI_LISTMONK_API_URL org secret holds the same base URL
+        DSCI_LISTMONK_BASE_URL: ${{ secrets.DSCI_LISTMONK_API_URL }}
         DSCI_LISTMONK_API_USERNAME: ${{ secrets.DSCI_LISTMONK_API_USERNAME}}
         DSCI_LISTMONK_API_KEY: ${{ secrets.DSCI_LISTMONK_API_KEY}}
         MONITORING_DATE: ${{ inputs.date || '' }}
