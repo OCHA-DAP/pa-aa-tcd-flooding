@@ -26,6 +26,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Install Roboto font for plots
+      run: sudo apt-get update -q && sudo apt-get install -y -q fonts-roboto
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
