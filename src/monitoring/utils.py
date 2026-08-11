@@ -12,6 +12,6 @@ def get_email_subject(
 ) -> str:
     test_text = "TEST : " if test else ""
     return (
-        f"{test_text} Action antipatoire Tchad : inondations fluviales"
+        f"{test_text}Action anticipatoire Tchad : inondations fluviales"
         f" - {trigger_status} {monitoring_date}"
     )
