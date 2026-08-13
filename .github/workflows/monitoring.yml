@@ -64,3 +64,17 @@ jobs:
         python pipelines/check_forecasts.py
         python pipelines/save_plots.py
         python pipelines/send_emails.py
+
+    - name: Send failure mail
+      if: failure()
+      uses: dawidd6/action-send-mail@v2
+      with:
+        server_address: ${{ secrets.DSCI_AWS_EMAIL_HOST }}
+        server_port: ${{ secrets.DSCI_AWS_EMAIL_PORT || 465 }}
+        username: ${{ secrets.DSCI_AWS_EMAIL_USERNAME }}
+        password: ${{ secrets.DSCI_AWS_EMAIL_PASSWORD }}
+        subject: "Chad AA Flood Monitoring - FAILED"
+        body: "GitHub Actions monitoring run for Chad AA flooding failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        to: zachary.arno@un.org,tristan.downing@un.org
+        from: OCHA Centre for Humanitarian Data <data.science@humdata.org>
+        content_type: text/html
