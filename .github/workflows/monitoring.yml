@@ -21,6 +21,9 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
 
     steps:
     - name: Checkout repository
@@ -65,16 +68,19 @@ jobs:
         python pipelines/save_plots.py
         python pipelines/send_emails.py
 
-    - name: Send failure mail
+    - name: Open issue on failure
       if: failure()
-      uses: dawidd6/action-send-mail@v2
-      with:
-        server_address: ${{ secrets.DSCI_AWS_EMAIL_HOST }}
-        server_port: ${{ secrets.DSCI_AWS_EMAIL_PORT || 465 }}
-        username: ${{ secrets.DSCI_AWS_EMAIL_USERNAME }}
-        password: ${{ secrets.DSCI_AWS_EMAIL_PASSWORD }}
-        subject: "Chad AA Flood Monitoring - FAILED"
-        body: "GitHub Actions monitoring run for Chad AA flooding failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        to: zachary.arno@un.org,tristan.downing@un.org
-        from: OCHA Centre for Humanitarian Data <data.science@humdata.org>
-        content_type: text/html
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        existing=$(gh issue list --repo "${{ github.repository }}" --state open --label pipeline-failure --json number --jq '.[0].number')
+        if [ -n "$existing" ]; then
+          gh issue comment "$existing" --repo "${{ github.repository }}" --body "Monitoring failed again: $run_url"
+        else
+          gh issue create --repo "${{ github.repository }}" \
+            --title "Monitoring pipeline failed" \
+            --label pipeline-failure \
+            --assignee zackarno \
+            --body "The scheduled flood monitoring workflow failed: $run_url"
+        fi
