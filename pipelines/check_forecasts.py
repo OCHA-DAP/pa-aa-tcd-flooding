@@ -6,6 +6,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from src.datasources import glofas
+from src.constants import STAGE
 from src.monitoring import etl
 
 load_dotenv()
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     df_all["monitoring_date"] = update_date
     print("Dataframe to be saved to database:")
     print(df_all)
-    engine = stratus.get_engine(stage="dev", write=True)
+    engine = stratus.get_engine(stage=STAGE, write=True)
     df_all.to_sql(
         etl.DB_TABLE,  # This table was created manually
         schema=etl.DB_SCHEMA,

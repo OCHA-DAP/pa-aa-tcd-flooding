@@ -6,7 +6,7 @@ import ocha_stratus as stratus
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
-from src.constants import FRENCH_MONTHS, PROJECT_PREFIX
+from src.constants import FRENCH_MONTHS, PROJECT_PREFIX, STAGE
 from src.monitoring import etl
 from src.monitoring.etl import get_activations_text
 
@@ -65,7 +65,7 @@ def combined_plots(df, glofas_thresh, save_output=True):
         plt.savefig(buffer, format="png", dpi=200)
         buffer.seek(0)
         container_client = stratus.get_container_client(
-            "projects", "dev", write=True
+            "projects", STAGE, write=True
         )
         blob_name = f"{PROJECT_PREFIX}/monitoring/{update_date}_{bool(activations)}.png"  # noqa: E501
 

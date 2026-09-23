@@ -5,7 +5,12 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 
 from src import cds_utils
-from src.constants import GLOFAS_THRESH, GLOFAS_WARNING_THRESH, PROJECT_PREFIX
+from src.constants import (
+    GLOFAS_THRESH,
+    GLOFAS_WARNING_THRESH,
+    PROJECT_PREFIX,
+    STAGE,
+)
 
 load_dotenv()
 
@@ -27,7 +32,7 @@ def get_glofas_forecast(
     keep_local_copy=True,
     overwrite=False,
 ):
-    container = stratus.get_container_client("projects", "dev")
+    container = stratus.get_container_client("projects", STAGE)
     if (
         container.get_blob_client(forecast_blob_name).exists()
         and not overwrite
@@ -55,6 +60,7 @@ def get_glofas_forecast(
         forecast_request,
         forecast_blob_name,
         keep_local_copy=keep_local_copy,
+        prod_dev=STAGE,
     )
 
 
@@ -84,7 +90,7 @@ def process_glofas(blob_name, data_type, station_name):
 
 
 def get_database_forecast(monitoring_date):
-    engine = stratus.get_engine(stage="dev")
+    engine = stratus.get_engine(stage=STAGE)
     with engine.connect() as con:
         df = pd.read_sql(
             text(f"""
