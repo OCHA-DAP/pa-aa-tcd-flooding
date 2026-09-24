@@ -4,6 +4,25 @@
 
 _Update 2024-09-28_: framework has been activated based on GloFAS forecasts.
 
+## Operational monitoring
+
+The daily riverine flood monitor (GloFAS forecast at N'Djamena → DB table
+`projects.pa_aa_tcd_flooding_monitoring` → chart → email) runs as the
+Databricks job **TCD Flood Monitoring** (20:00 UTC), defined in
+`databricks.yml`: three chained tasks running `pipelines/check_forecasts.py`,
+`pipelines/save_plots.py` and `pipelines/send_emails.py` unchanged through
+`databricks/run_task.py`. The `dev` target runs the dev data plane with test
+emails; the `prod` target sets `STAGE=prod`.
+
+```shell
+databricks bundle validate -t dev -p DEFAULT
+databricks bundle deploy   -t dev -p DEFAULT
+databricks bundle run tcd_flood_monitoring -t dev -p DEFAULT
+```
+
+The GitHub Actions workflow `monitoring.yml` remains as a manual fallback
+(`workflow_dispatch`); its cron is gone.
+
 ## Background information
 
 Provide a basic overview of the context of anticipatory action in this country.
