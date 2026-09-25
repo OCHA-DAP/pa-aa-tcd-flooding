@@ -9,16 +9,12 @@
 #     send_emails      pipelines/send_emails.py      DB + blob → email (SES / Listmonk)
 #
 # Each task goes through databricks/run_task.py, which sets the run-mode env
-# vars the code reads at import (STAGE, MONITORING_DATE) and copies src/ +
-# pipelines/ off the wsfs checkout before importing. DB/blob/CDS credentials
-# are NOT here — the Job Compute policy injects DSCI_AZ_* and CDSAPI_KEY from
-# the `dsci` secret scope; the Listmonk sender creds (not in the policy) are
-# added below via spark_env_vars.
-#
-# NOTE: on this branch the code's data plane is hardcoded to DEV (DB + blob);
-# STAGE only switches live-vs-test emailing. The prod cutover (STAGE selecting
-# the data plane, SES backend, prod projects schema) is a separate PR stacked
-# on this one — until it merges, run the `dev` target only.
+# vars the code reads at import (STAGE = live-vs-test emailing, DATA_STAGE = ocha-stratus data plane, EMAIL_BACKEND,
+# ALWAYS_EMAIL, TEST_EMAIL, MONITORING_DATE) and copies src/ + pipelines/ off
+# the wsfs checkout before importing. DB/blob/CDS credentials are NOT here —
+# the Job Compute policy injects DSCI_AZ_* and CDSAPI_KEY from the `dsci`
+# secret scope; the SES + Listmonk sender creds (not in the policy) are added
+# below via spark_env_vars.
 #
 # The policy fixes CDSAPI_URL to plain CDS; GloFAS lives on EWDS, so the
 # wrapper overrides CDSAPI_URL in the script's environment (see tasks).
@@ -29,7 +25,8 @@
 #
 #   databricks bundle validate -t dev  -p DEFAULT
 #   databricks bundle deploy   -t dev  -p DEFAULT --var git_branch=my-branch   # feature test (paused)
-#   databricks bundle run tcd_flood_monitoring -t dev -p DEFAULT             # dev data, test list
+#   databricks bundle run tcd_flood_monitoring -t dev -p DEFAULT \
+#       --params stage=prod,test_email=true                                    # prod data, email to Tristan only
 #   databricks bundle destroy  -t dev  -p DEFAULT
 #   databricks bundle deploy   -t prod -p DEFAULT                              # the live job
 #
@@ -45,8 +42,20 @@ variables:
     description: Repo branch the job pulls the pipeline code from
     default: main
   stage:
-    description: STAGE env for the pipeline (dev | prod) — live-vs-test emailing (data plane once the prod cutover PR lands)
+    description: ocha-stratus data plane (dev | prod) — also live-vs-test emailing
     default: dev
+  data_stage:
+    description: ocha-stratus data plane (dev | prod) — DEV since 2026-09-25 (private endpoint from Databricks; prod has no projects schema yet); `stage` alone keeps meaning live-vs-test emailing
+    default: dev
+  email_backend:
+    description: '"ses" (direct SMTP, TEMPORARY while Listmonk is down) or "listmonk"'
+    default: ses
+  always_email:
+    description: '"true" = informational email every day (cutover heartbeat); "false" = activations / warnings / Mondays only'
+    default: "true"
+  test_email:
+    description: '"true" = send only to the test recipient even when stage=prod; the prod target sets "false"'
+    default: "true"
 
 .git_source: &git_source
   git_url: https://github.com/OCHA-DAP/pa-aa-tcd-flooding.git
@@ -55,12 +64,16 @@ variables:
 
 # Job Compute policy (000C79D951EAF0D6): ephemeral single-worker cluster that
 # injects DSCI_AZ_DB_*/DSCI_AZ_BLOB_* (dev + prod) and CDSAPI_KEY from the
-# dsci secret scope. The Listmonk sender creds are not in the policy, so add them.
+# dsci secret scope. Email sender creds are not in the policy, so add them.
 .cluster_spec: &cluster_spec
   policy_id: "000C79D951EAF0D6"
   apply_policy_default_values: true
   num_workers: 1
   spark_env_vars:
+    DSCI_AWS_EMAIL_HOST: "{{secrets/dsci/DSCI_AWS_EMAIL_HOST}}"
+    DSCI_AWS_EMAIL_USERNAME: "{{secrets/dsci/DSCI_AWS_EMAIL_USERNAME}}"
+    DSCI_AWS_EMAIL_PASSWORD: "{{secrets/dsci/DSCI_AWS_EMAIL_PASSWORD}}"
+    DSCI_AWS_EMAIL_ADDRESS: "{{secrets/dsci/DSCI_AWS_EMAIL_ADDRESS}}"
     DSCI_LISTMONK_BASE_URL: "{{secrets/dsci/DSCI_LISTMONK_BASE_URL}}"
     DSCI_LISTMONK_API_USERNAME: "{{secrets/dsci/DSCI_LISTMONK_API_USERNAME}}"
     DSCI_LISTMONK_API_KEY: "{{secrets/dsci/DSCI_LISTMONK_API_KEY}}"
@@ -121,6 +134,14 @@ resources:
       parameters:
         - name: stage
           default: ${var.stage}
+        - name: data_stage
+          default: ${var.data_stage}
+        - name: email_backend
+          default: ${var.email_backend}
+        - name: always_email
+          default: ${var.always_email}
+        - name: test_email
+          default: ${var.test_email}
         - name: monitoring_date
           # YYYY-MM-DD; empty = today
           default: ""
@@ -141,6 +162,14 @@ resources:
               - "--stage"
               - "{{job.parameters.stage}}"
               - "--env"
+              - "DATA_STAGE={{job.parameters.data_stage}}"
+              - "--env"
+              - "EMAIL_BACKEND={{job.parameters.email_backend}}"
+              - "--env"
+              - "ALWAYS_EMAIL={{job.parameters.always_email}}"
+              - "--env"
+              - "TEST_EMAIL={{job.parameters.test_email}}"
+              - "--env"
               - "MONITORING_DATE={{job.parameters.monitoring_date}}"
               # GloFAS is served by EWDS, not the plain CDS URL the policy fixes.
               - "--env"
@@ -159,6 +188,14 @@ resources:
               - "--stage"
               - "{{job.parameters.stage}}"
               - "--env"
+              - "DATA_STAGE={{job.parameters.data_stage}}"
+              - "--env"
+              - "EMAIL_BACKEND={{job.parameters.email_backend}}"
+              - "--env"
+              - "ALWAYS_EMAIL={{job.parameters.always_email}}"
+              - "--env"
+              - "TEST_EMAIL={{job.parameters.test_email}}"
+              - "--env"
               - "MONITORING_DATE={{job.parameters.monitoring_date}}"
               # GloFAS is served by EWDS, not the plain CDS URL the policy fixes.
               - "--env"
@@ -176,6 +213,14 @@ resources:
               - "pipelines/send_emails.py"
               - "--stage"
               - "{{job.parameters.stage}}"
+              - "--env"
+              - "DATA_STAGE={{job.parameters.data_stage}}"
+              - "--env"
+              - "EMAIL_BACKEND={{job.parameters.email_backend}}"
+              - "--env"
+              - "ALWAYS_EMAIL={{job.parameters.always_email}}"
+              - "--env"
+              - "TEST_EMAIL={{job.parameters.test_email}}"
               - "--env"
               - "MONITORING_DATE={{job.parameters.monitoring_date}}"
               # GloFAS is served by EWDS, not the plain CDS URL the policy fixes.
@@ -199,3 +244,5 @@ targets:
       user_name: adm.tdowning@global.un.org
     variables:
       stage: prod
+      data_stage: dev
+      test_email: "false"
