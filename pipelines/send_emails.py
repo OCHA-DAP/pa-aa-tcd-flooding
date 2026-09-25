@@ -11,6 +11,7 @@ from ocha_relay.listmonk import ListmonkClient
 
 from src.constants import (
     ALWAYS_EMAIL,
+    DATA_STAGE,
     EMAIL_BACKEND,
     LISTMONK_INFO_LIST_ID,
     LISTMONK_TEST_LIST_ID,
@@ -74,7 +75,7 @@ if __name__ == "__main__":
                 )
                 image_data = io.BytesIO()
                 blob_client = stratus.get_container_client(
-                    "projects", STAGE
+                    "projects", DATA_STAGE
                 ).get_blob_client(blob_name)
                 blob_client.download_blob().readinto(image_data)
                 image_data.seek(0)
