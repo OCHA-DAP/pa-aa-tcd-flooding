@@ -106,14 +106,15 @@ resources:
 
     tcd_flood_monitoring:
       name: TCD Flood Monitoring
-      description: >
-        Daily Chad riverine flood AA monitor: GloFAS forecast at N'Djamena
-        (EWDS) → projects.pa_aa_tcd_flooding_monitoring → chart → email.
-        Replaces the GitHub Actions "Monitor flooding" cron.
+      description: "Monitor the Chad riverine trigger using the [GloFAS](https://global-flood.emergency.copernicus.eu/) forecast at N'Djamena"
       git_source: *git_source
       tags:
         databricks: job
-        output_schema: projects
+        type: monitoring
+        hazard: flood
+        kb: tcd-flooding-monitoring
+        output_schema: projects.pa_aa_tcd_flooding_monitoring
+        output_blob: projects/pa-aa-tcd-flooding/monitoring
 
       permissions:
         - group_name: dsci
